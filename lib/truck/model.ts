@@ -1,4 +1,4 @@
-import type { BuildSpec } from "../types";
+import type { BuildSpec, VehicleModel } from "../types";
 
 // Deterministic BuildSpec -> 3D scene description. Pure data — the viewer
 // (components/TruckViewer.tsx) maps these to meshes. 1 unit = 1 foot.
@@ -77,13 +77,19 @@ export function equipmentColorFor(type: string): string {
 
 const WALL = 0.25; // wall thickness, ft
 
-export function buildTruckScene(spec: BuildSpec): TruckScene {
-  const L = clamp(spec.dimensions.lengthFt, 10, 40);
-  const W = clamp(spec.dimensions.widthFt, 6, 10);
-  const isTrailer = spec.truckType === "bbq_smoker_trailer";
+// When a vehicle model is supplied, the build is constructed on its real
+// geometry; otherwise the spec's own dimensions drive a generic box.
+export function buildTruckScene(
+  spec: BuildSpec,
+  vehicle?: VehicleModel | null,
+): TruckScene {
+  const L = clamp(vehicle?.length_ft ?? spec.dimensions.lengthFt, 10, 45);
+  const W = clamp(vehicle?.width_ft ?? spec.dimensions.widthFt, 6, 10);
+  const isTrailer = vehicle ? vehicle.is_trailer : spec.truckType === "bbq_smoker_trailer";
+  const cabLengthFt = vehicle ? vehicle.cab_length_ft : isTrailer ? 0 : 4;
   const wheelR = 1.3;
   const floorY = wheelR + 0.6; // floor height above ground
-  const bodyH = clamp(spec.dimensions.heightFt, 7, 12) - floorY;
+  const bodyH = clamp(vehicle?.height_ft ?? spec.dimensions.heightFt, 7, 12) - floorY;
   const bodyColor = bodyColorFor(spec);
 
   // --- shell -----------------------------------------------------------------
@@ -101,11 +107,11 @@ export function buildTruckScene(spec: BuildSpec): TruckScene {
 
   // --- cab / drawbar ----------------------------------------------------------
   const cab: Box[] = [];
-  if (isTrailer) {
+  if (isTrailer || cabLengthFt <= 0) {
     // tongue + hitch
     cab.push({ position: [L / 2 + 1.5, floorY - 0.2, 0], size: [3, 0.3, 0.3], color: "#52525b" });
   } else {
-    const cabL = 4;
+    const cabL = cabLengthFt;
     cab.push(
       { position: [L / 2 + cabL / 2, floorY + 1.6, 0], size: [cabL, 3.2, W * 0.92], color: bodyColor },
       // windshield
@@ -190,9 +196,13 @@ export function buildTruckScene(spec: BuildSpec): TruckScene {
 
   // --- wheels -------------------------------------------------------------------
   const wheelZ = W / 2 - 0.8;
-  const wheelXs = isTrailer
-    ? [-L * 0.18, -L * 0.02]
-    : [L / 2 + 2.5, -L * 0.28];
+  // Use the vehicle's real axle positions (ft from front -> scene x) when known.
+  const wheelXs =
+    vehicle && vehicle.axle_positions.length
+      ? vehicle.axle_positions.map((d) => clamp(L / 2 - d, -L / 2, L / 2 + 3))
+      : isTrailer
+        ? [-L * 0.18, -L * 0.02]
+        : [L / 2 + 2.5, -L * 0.28];
   const wheels: Cylinder[] = wheelXs.flatMap((wx) => [
     { position: [wx, wheelR, wheelZ], radius: wheelR, width: 0.7, color: "#18181b" },
     { position: [wx, wheelR, -wheelZ], radius: wheelR, width: 0.7, color: "#18181b" },

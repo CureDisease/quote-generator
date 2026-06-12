@@ -48,6 +48,7 @@ export interface Quote {
   requirements: string;
   quote_data: QuoteData;
   build_spec: BuildSpec;
+  vehicle_model_id: string | null;
   revisions: QuoteRevision[];
   ai_provider: string;
   ai_model: string;
@@ -161,6 +162,57 @@ export interface CatalogItem {
   tags: string[];
   notes: string;
   source: "manual" | "extracted";
+  active: boolean;
+}
+
+// ----- Vehicle models & workshop mods ----------------------------------------
+
+// A panel zone where the shop can cut openings (serving window, door, hatch).
+export interface CutZone {
+  side: "street" | "curb" | "rear" | "front" | "roof";
+  label: string;
+  maxWidthIn: number;
+}
+
+export interface VehicleModel {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  label: string;
+  make: string;
+  model: string;
+  variant: string;
+  is_trailer: boolean;
+  length_ft: number;
+  width_ft: number;
+  height_ft: number;
+  cab_length_ft: number;
+  wheelbase_ft: number;
+  axle_positions: number[]; // ft from front of body to each axle center
+  gvwr_lbs: number;
+  cut_zones: CutZone[];
+  notes: string;
+  active: boolean;
+}
+
+export const MOD_CATEGORIES = [
+  "exterior",
+  "structural",
+  "utility",
+  "finish",
+] as const;
+export type ModCategory = (typeof MOD_CATEGORIES)[number];
+
+export interface WorkshopMod {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  category: ModCategory;
+  unit_price: number;
+  labor_hours: number;
+  allowed_zones: string[];
+  notes: string;
   active: boolean;
 }
 

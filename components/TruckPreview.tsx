@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { BuildSpec } from "@/lib/types";
+import type { BuildSpec, VehicleModel } from "@/lib/types";
 
 // three.js can't render on the server — load the viewer client-side only.
 const TruckViewer = dynamic(() => import("./TruckViewer"), {
@@ -15,9 +15,11 @@ const TruckViewer = dynamic(() => import("./TruckViewer"), {
 
 export function TruckPreview({
   spec,
+  vehicle,
   className,
 }: {
   spec: BuildSpec;
+  vehicle?: VehicleModel | null;
   className?: string;
 }) {
   return (
@@ -27,7 +29,7 @@ export function TruckPreview({
         "h-80 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]"
       }
     >
-      <TruckViewer spec={spec} />
+      <TruckViewer spec={spec} vehicle={vehicle} />
     </div>
   );
 }

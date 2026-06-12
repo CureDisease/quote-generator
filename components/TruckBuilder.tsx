@@ -10,6 +10,7 @@ import {
   type BuildSpec,
   type CatalogItem,
   type SpecEquipment,
+  type VehicleModel,
 } from "@/lib/types";
 
 interface PlacedItem {
@@ -91,10 +92,12 @@ export function TruckBuilder({
   quoteId,
   spec: initialSpec,
   catalog,
+  vehicle,
 }: {
   quoteId: string;
   spec: BuildSpec;
   catalog: CatalogItem[];
+  vehicle?: VehicleModel | null;
 }) {
   const router = useRouter();
   const [spec, setSpec] = useState<BuildSpec>(initialSpec);
@@ -112,8 +115,9 @@ export function TruckBuilder({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const drag = useRef<string | null>(null);
 
-  const L = spec.dimensions.lengthFt;
-  const W = spec.dimensions.widthFt;
+  // The base vehicle's real body dimensions drive the plan when one is set.
+  const L = vehicle?.length_ft ?? spec.dimensions.lengthFt;
+  const W = vehicle?.width_ft ?? spec.dimensions.widthFt;
 
   // Keep the live 3D preview / save payload in sync with placements.
   const liveSpec = useMemo<BuildSpec>(
@@ -336,7 +340,7 @@ export function TruckBuilder({
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
             3D preview
           </h2>
-          <TruckPreview spec={liveSpec} className="h-80 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]" />
+          <TruckPreview spec={liveSpec} vehicle={vehicle} className="h-80 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]" />
         </div>
 
         {/* AI edit */}

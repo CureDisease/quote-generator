@@ -11,6 +11,8 @@ import type {
   QuoteData,
   QuoteStatus,
   TrainingDocument,
+  VehicleModel,
+  WorkshopMod,
 } from "./types";
 import type { ExtractedCatalogItem } from "./ai/provider";
 
@@ -288,6 +290,109 @@ export async function updateCatalogItem(
 export async function deleteCatalogItem(id: string): Promise<void> {
   const sb = getSupabase();
   await sb.from("equipment_catalog").delete().eq("id", id);
+}
+
+// ----- Vehicle models --------------------------------------------------------
+
+export async function listVehicleModels(
+  opts: { activeOnly?: boolean } = {},
+): Promise<VehicleModel[]> {
+  const sb = getSupabase();
+  let query = sb
+    .from("vehicle_models")
+    .select("*")
+    .order("label", { ascending: true });
+  if (opts.activeOnly) query = query.eq("active", true);
+  const { data } = await query;
+  return (data as VehicleModel[]) ?? [];
+}
+
+export async function getVehicleModel(
+  id: string,
+): Promise<VehicleModel | null> {
+  const sb = getSupabase();
+  const { data } = await sb
+    .from("vehicle_models")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as VehicleModel) ?? null;
+}
+
+type VehicleInput = Omit<
+  VehicleModel,
+  "id" | "created_at" | "updated_at" | "active"
+>;
+
+export async function addVehicleModel(input: VehicleInput): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("vehicle_models").insert(input);
+}
+
+export async function updateVehicleModel(
+  id: string,
+  patch: Partial<VehicleInput & { active: boolean }>,
+): Promise<void> {
+  const sb = getSupabase();
+  await sb
+    .from("vehicle_models")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
+export async function deleteVehicleModel(id: string): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("vehicle_models").delete().eq("id", id);
+}
+
+// ----- Workshop modifications ------------------------------------------------
+
+export async function listWorkshopMods(
+  opts: { activeOnly?: boolean } = {},
+): Promise<WorkshopMod[]> {
+  const sb = getSupabase();
+  let query = sb
+    .from("workshop_mods")
+    .select("*")
+    .order("category", { ascending: true })
+    .order("name", { ascending: true });
+  if (opts.activeOnly) query = query.eq("active", true);
+  const { data } = await query;
+  return (data as WorkshopMod[]) ?? [];
+}
+
+type ModInput = Omit<WorkshopMod, "id" | "created_at" | "updated_at" | "active">;
+
+export async function addWorkshopMod(input: ModInput): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("workshop_mods").insert(input);
+}
+
+export async function updateWorkshopMod(
+  id: string,
+  patch: Partial<ModInput & { active: boolean }>,
+): Promise<void> {
+  const sb = getSupabase();
+  await sb
+    .from("workshop_mods")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
+export async function deleteWorkshopMod(id: string): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("workshop_mods").delete().eq("id", id);
+}
+
+export async function setQuoteVehicle(
+  quoteId: string,
+  vehicleModelId: string | null,
+): Promise<void> {
+  const sb = getSupabase();
+  await sb
+    .from("quotes")
+    .update({ vehicle_model_id: vehicleModelId })
+    .eq("id", quoteId);
 }
 
 // ----- Build documents (customer uploads) -----------------------------------

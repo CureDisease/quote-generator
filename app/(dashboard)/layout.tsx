@@ -31,6 +31,7 @@ export default function DashboardLayout({
           </Link>
           <nav className="flex items-center gap-1">
             <NavLink href="/" label="Dashboard" />
+            <NavLink href="/vehicles" label="Vehicles & Workshop" />
             <NavLink href="/knowledge" label="Knowledge & Training" />
             <Link
               href="/quotes/new"

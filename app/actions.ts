@@ -5,20 +5,28 @@ import { redirect } from "next/navigation";
 import {
   addCatalogItem,
   addKnowledge,
+  addVehicleModel,
+  addWorkshopMod,
   deleteCatalogItem,
   deleteKnowledge,
   deleteQuote,
+  deleteVehicleModel,
+  deleteWorkshopMod,
   getActiveKnowledge,
   getQuote,
   getSettings,
+  getVehicleModel,
   insertQuote,
   listCatalog,
   mergeCatalogItems,
   setKnowledgeActive,
   setQuoteShareEnabled,
+  setQuoteVehicle,
   updateCatalogItem,
   updateQuote,
   updateSettings,
+  updateVehicleModel,
+  updateWorkshopMod,
   uploadBuildDocument,
 } from "@/lib/data";
 import { providerFor } from "@/lib/ai";
@@ -29,9 +37,11 @@ import type {
   AiProviderName,
   BuildSpec,
   CatalogItem,
+  CutZone,
   DocType,
   QuoteStatus,
   TruckType,
+  WorkshopMod,
 } from "@/lib/types";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB per file
@@ -454,6 +464,122 @@ export async function deleteCatalogItemAction(formData: FormData) {
   await deleteCatalogItem(id);
   revalidatePath("/knowledge");
   redirect("/knowledge#catalog");
+}
+
+// ----- Vehicle models --------------------------------------------------------
+
+function parseNums(s: string): number[] {
+  return s
+    .split(",")
+    .map((x) => Number(x.trim()))
+    .filter((n) => Number.isFinite(n));
+}
+
+function vehicleFromForm(formData: FormData) {
+  return {
+    label: String(formData.get("label") ?? "").trim() || "Untitled vehicle",
+    make: String(formData.get("make") ?? "").trim(),
+    model: String(formData.get("model") ?? "").trim(),
+    variant: String(formData.get("variant") ?? "").trim(),
+    is_trailer: formData.get("is_trailer") != null,
+    length_ft: Number(formData.get("length_ft") ?? 20) || 20,
+    width_ft: Number(formData.get("width_ft") ?? 8) || 8,
+    height_ft: Number(formData.get("height_ft") ?? 9.5) || 9.5,
+    cab_length_ft: Number(formData.get("cab_length_ft") ?? 4) || 0,
+    wheelbase_ft: Number(formData.get("wheelbase_ft") ?? 12) || 0,
+    axle_positions: parseNums(String(formData.get("axle_positions") ?? "")),
+    gvwr_lbs: Number(formData.get("gvwr_lbs") ?? 0) || 0,
+    cut_zones: [] as CutZone[],
+    notes: String(formData.get("notes") ?? "").trim(),
+  };
+}
+
+export async function addVehicleAction(formData: FormData) {
+  await addVehicleModel(vehicleFromForm(formData));
+  revalidatePath("/vehicles");
+  redirect("/vehicles");
+}
+
+export async function updateVehicleAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/vehicles");
+  await updateVehicleModel(id, vehicleFromForm(formData));
+  revalidatePath("/vehicles");
+  redirect("/vehicles");
+}
+
+export async function deleteVehicleAction(formData: FormData) {
+  await deleteVehicleModel(String(formData.get("id") ?? ""));
+  revalidatePath("/vehicles");
+  redirect("/vehicles");
+}
+
+// ----- Workshop modifications ------------------------------------------------
+
+function modFromForm(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? "").trim() || "Untitled mod",
+    category: String(formData.get("category") ?? "exterior") as WorkshopMod["category"],
+    unit_price: Number(formData.get("unit_price") ?? 0) || 0,
+    labor_hours: Number(formData.get("labor_hours") ?? 0) || 0,
+    allowed_zones: String(formData.get("allowed_zones") ?? "")
+      .split(",")
+      .map((z) => z.trim())
+      .filter(Boolean),
+    notes: String(formData.get("notes") ?? "").trim(),
+  };
+}
+
+export async function addModAction(formData: FormData) {
+  await addWorkshopMod(modFromForm(formData));
+  revalidatePath("/vehicles");
+  redirect("/vehicles#mods");
+}
+
+export async function updateModAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/vehicles#mods");
+  await updateWorkshopMod(id, modFromForm(formData));
+  revalidatePath("/vehicles");
+  redirect("/vehicles#mods");
+}
+
+export async function deleteModAction(formData: FormData) {
+  await deleteWorkshopMod(String(formData.get("id") ?? ""));
+  revalidatePath("/vehicles");
+  redirect("/vehicles#mods");
+}
+
+// Choose the base vehicle for a quote; copies its body dims into the spec so
+// the size is consistent everywhere (incl. the customer share page).
+export async function setQuoteVehicleAction(formData: FormData) {
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const vehicleId = String(formData.get("vehicleModelId") ?? "");
+  const quote = await getQuote(quoteId);
+  if (!quote) redirect("/");
+  if (!vehicleId) {
+    await setQuoteVehicle(quoteId, null);
+  } else {
+    const vehicle = await getVehicleModel(vehicleId);
+    await setQuoteVehicle(quoteId, vehicleId);
+    if (vehicle) {
+      const spec = normalizeBuildSpec(
+        {
+          ...quote.build_spec,
+          baseVehicle: vehicle.label,
+          dimensions: {
+            lengthFt: vehicle.length_ft,
+            widthFt: vehicle.width_ft,
+            heightFt: vehicle.height_ft,
+          },
+        },
+        quote.truck_type,
+      );
+      await updateQuote(quoteId, { build_spec: spec });
+    }
+  }
+  revalidatePath(`/quotes/${quoteId}`);
+  redirect(`/quotes/${quoteId}/spec`);
 }
 
 // ----- AI behavior / provider settings --------------------------------------

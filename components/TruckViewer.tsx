@@ -4,7 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Text } from "@react-three/drei";
 import { useMemo } from "react";
 import { buildTruckScene, type Box, type TruckScene } from "@/lib/truck/model";
-import type { BuildSpec } from "@/lib/types";
+import type { BuildSpec, VehicleModel } from "@/lib/types";
 
 function BoxMesh({ box }: { box: Box }) {
   return (
@@ -74,8 +74,14 @@ function TruckModel({ scene }: { scene: TruckScene }) {
   );
 }
 
-export default function TruckViewer({ spec }: { spec: BuildSpec }) {
-  const scene = useMemo(() => buildTruckScene(spec), [spec]);
+export default function TruckViewer({
+  spec,
+  vehicle,
+}: {
+  spec: BuildSpec;
+  vehicle?: VehicleModel | null;
+}) {
+  const scene = useMemo(() => buildTruckScene(spec, vehicle), [spec, vehicle]);
   const camDist = scene.lengthFt * 1.15;
 
   return (

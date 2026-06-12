@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { generateQuoteAction } from "@/app/actions";
+import { generateQuoteAction, setQuoteVehicleAction } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { TruckPreview } from "@/components/TruckPreview";
-import { getQuote, listBuildDocuments } from "@/lib/data";
+import {
+  getQuote,
+  getVehicleModel,
+  listBuildDocuments,
+  listVehicleModels,
+} from "@/lib/data";
 import {
   equipmentToLines,
   isBlankSpec,
@@ -23,7 +28,11 @@ export default async function SpecReviewPage({
 }) {
   const quote = await getQuote(params.id);
   if (!quote) notFound();
-  const docs = await listBuildDocuments(params.id);
+  const [docs, vehicles, vehicle] = await Promise.all([
+    listBuildDocuments(params.id),
+    listVehicleModels({ activeOnly: true }),
+    quote.vehicle_model_id ? getVehicleModel(quote.vehicle_model_id) : Promise.resolve(null),
+  ]);
   const spec = normalizeBuildSpec(quote.build_spec, quote.truck_type);
   const hasQuote = (quote.quote_data?.lineItems?.length ?? 0) > 0;
 
@@ -52,12 +61,47 @@ export default async function SpecReviewPage({
         </div>
       ) : null}
 
+      {/* Base vehicle selector */}
+      <form
+        action={setQuoteVehicleAction}
+        className="flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-ink-soft/60 p-4"
+      >
+        <input type="hidden" name="quoteId" value={quote.id} />
+        <label className="block flex-1">
+          <span className="mb-1.5 block text-xs font-medium text-zinc-400">
+            Base vehicle (drives the 3D model &amp; build sheet)
+          </span>
+          <select
+            name="vehicleModelId"
+            defaultValue={quote.vehicle_model_id ?? ""}
+            className="input"
+          >
+            <option value="">Generic box (no specific vehicle)</option>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <SubmitButton pendingLabel="Applying…">Set vehicle</SubmitButton>
+        {vehicles.length === 0 ? (
+          <p className="w-full text-xs text-zinc-500">
+            No vehicles defined yet — add them on{" "}
+            <Link href="/vehicles" className="underline">
+              Vehicles &amp; Workshop
+            </Link>
+            .
+          </p>
+        ) : null}
+      </form>
+
       {!isBlankSpec(spec) ? (
         <div>
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
             Build preview — drag to rotate, scroll to zoom
           </h3>
-          <TruckPreview spec={spec} />
+          <TruckPreview spec={spec} vehicle={vehicle} />
           <p className="mt-1.5 text-xs text-zinc-500">
             The preview updates after you save the spec.
           </p>

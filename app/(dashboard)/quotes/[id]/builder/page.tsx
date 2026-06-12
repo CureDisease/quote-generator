@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TruckBuilder } from "@/components/TruckBuilder";
-import { getQuote, listCatalog } from "@/lib/data";
+import { getQuote, getVehicleModel, listCatalog } from "@/lib/data";
 import { normalizeBuildSpec } from "@/lib/spec";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,10 @@ export default async function BuilderPage({
 }) {
   const quote = await getQuote(params.id);
   if (!quote) notFound();
-  const catalog = await listCatalog({ activeOnly: true });
+  const [catalog, vehicle] = await Promise.all([
+    listCatalog({ activeOnly: true }),
+    quote.vehicle_model_id ? getVehicleModel(quote.vehicle_model_id) : Promise.resolve(null),
+  ]);
   const spec = normalizeBuildSpec(quote.build_spec, quote.truck_type);
 
   return (
@@ -35,7 +38,7 @@ export default async function BuilderPage({
         </p>
       </div>
 
-      <TruckBuilder quoteId={quote.id} spec={spec} catalog={catalog} />
+      <TruckBuilder quoteId={quote.id} spec={spec} catalog={catalog} vehicle={vehicle} />
     </div>
   );
 }

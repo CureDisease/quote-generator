@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getQuote, getQuoteShare } from "@/lib/data";
+import { getQuote, getQuoteShare, getVehicleModel } from "@/lib/data";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { QuoteDocument } from "@/components/QuoteDocument";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -30,7 +30,10 @@ export default async function QuoteDetailPage({
   // Intake complete but quote not generated yet — review the spec first.
   if (!quote!.quote_data?.lineItems?.length) redirect(`/quotes/${params.id}/spec`);
 
-  const share = await getQuoteShare(params.id);
+  const [share, vehicle] = await Promise.all([
+    getQuoteShare(params.id),
+    quote!.vehicle_model_id ? getVehicleModel(quote!.vehicle_model_id) : Promise.resolve(null),
+  ]);
   const spec = normalizeBuildSpec(quote!.build_spec, quote!.truck_type);
   const showTruck = !isBlankSpec(spec);
 
@@ -62,6 +65,7 @@ export default async function QuoteDetailPage({
           </h2>
           <TruckPreview
             spec={spec}
+            vehicle={vehicle}
             className="h-96 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]"
           />
         </div>
