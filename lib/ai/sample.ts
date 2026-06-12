@@ -1,6 +1,13 @@
-import type { LineItem, QuoteData } from "../types";
+import type { BuildSpec, LineItem, QuoteData, TruckType } from "../types";
 import { normalizeQuoteData } from "../quote";
-import type { AiResult, QuoteAiProvider, QuoteContext } from "./provider";
+import { normalizeBuildSpec } from "../spec";
+import type {
+  AiResult,
+  ExtractContext,
+  QuoteAiProvider,
+  QuoteContext,
+  SpecResult,
+} from "./provider";
 
 // Rough base build-out templates per truck type. This is intentionally simple,
 // deterministic placeholder logic so the dashboard's full flow works BEFORE a
@@ -58,6 +65,72 @@ function buildQuote(ctx: QuoteContext, extra: LineItem[] = []): QuoteData {
   });
 }
 
+// Rough starting points per build type for the sample extractor.
+const SPEC_TEMPLATES: Record<string, Partial<BuildSpec>> = {
+  food_truck: {
+    baseVehicle: "20ft step van",
+    dimensions: { lengthFt: 20, widthFt: 8, heightFt: 9.5 },
+    equipment: [
+      { name: "Flat-top griddle", type: "cooking", location: "street-side galley", specs: "" },
+      { name: "6-burner range + oven", type: "cooking", location: "street-side galley", specs: "" },
+      { name: "Commercial vent hood", type: "ventilation", location: "over cook line", specs: "with fire suppression" },
+      { name: "Reach-in refrigerator", type: "refrigeration", location: "rear", specs: "" },
+      { name: "3-compartment sink", type: "sink", location: "curb-side", specs: "" },
+    ],
+    power: { generatorKw: 7, shorePower: true, batteries: false, solar: false, notes: "" },
+    plumbing: { freshTankGal: 40, greyTankGal: 45, sinks: 2, waterHeater: true, notes: "" },
+    exterior: { paintColor: "", wrap: "Full vinyl wrap", servingWindows: [{ side: "curb", widthIn: 48 }] },
+  },
+  coffee_truck: {
+    baseVehicle: "Compact van",
+    dimensions: { lengthFt: 18, widthFt: 7.5, heightFt: 9 },
+    equipment: [
+      { name: "Dual-group espresso machine", type: "cooking", location: "curb-side bar", specs: "" },
+      { name: "Coffee grinders", type: "prep", location: "curb-side bar", specs: "" },
+      { name: "Under-counter refrigeration", type: "refrigeration", location: "under bar", specs: "" },
+      { name: "Hand sink + prep sink", type: "sink", location: "curb-side", specs: "" },
+    ],
+    power: { generatorKw: 5, shorePower: true, batteries: false, solar: false, notes: "" },
+    plumbing: { freshTankGal: 30, greyTankGal: 32, sinks: 2, waterHeater: true, notes: "" },
+    exterior: { paintColor: "", wrap: "Vinyl wrap", servingWindows: [{ side: "curb", widthIn: 40 }] },
+  },
+};
+
+function starterSpec(ctx: ExtractContext): BuildSpec {
+  const tmpl = SPEC_TEMPLATES[ctx.truckType] ?? SPEC_TEMPLATES.food_truck;
+  const docText = ctx.documents
+    .map((d) => d.text)
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+  const mediaCount = ctx.documents.filter((d) => d.media).length;
+  const summaryBits = [ctx.requirements.trim(), docText].filter(Boolean);
+  const summary =
+    summaryBits.join(" ").slice(0, 600) ||
+    `Starter ${ctx.truckType.replace("_", " ")} spec — connect an AI provider to extract details from uploads.`;
+
+  const openQuestions = [
+    "Confirm exact dimensions and base vehicle.",
+    "Confirm equipment list and placement with the customer.",
+  ];
+  if (mediaCount > 0) {
+    openQuestions.push(
+      `${mediaCount} uploaded file(s) (PDF/image) were not read — connect the AI provider to extract them.`,
+    );
+  }
+
+  return normalizeBuildSpec(
+    {
+      ...tmpl,
+      truckType: ctx.truckType as TruckType,
+      summary,
+      mustHaves: ctx.requirements.trim() ? [ctx.requirements.trim()] : [],
+      openQuestions,
+    },
+    ctx.truckType as TruckType,
+  );
+}
+
 /**
  * The framework's default provider. Produces a realistic, fully-structured
  * quote with zero external dependencies so the dashboard is usable end-to-end
@@ -65,6 +138,15 @@ function buildQuote(ctx: QuoteContext, extra: LineItem[] = []): QuoteData {
  */
 export const sampleProvider: QuoteAiProvider = {
   name: "sample",
+
+  async extractSpec(ctx: ExtractContext): Promise<SpecResult> {
+    return {
+      spec: starterSpec(ctx),
+      provider: "sample",
+      model: "built-in-estimator",
+      note: "Sample extractor produced a starter spec from the build type. Connect an AI provider to read your uploaded documents.",
+    };
+  },
 
   async generate(ctx: QuoteContext): Promise<AiResult> {
     return {

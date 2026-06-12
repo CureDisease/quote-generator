@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getQuote } from "@/lib/data";
 import { QuoteDocument } from "@/components/QuoteDocument";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -23,6 +23,8 @@ export default async function QuoteDetailPage({
 }) {
   const quote = await getQuote(params.id);
   if (!quote) notFound();
+  // Intake complete but quote not generated yet — review the spec first.
+  if (!quote!.quote_data?.lineItems?.length) redirect(`/quotes/${params.id}/spec`);
 
   return (
     <div className="space-y-6">
@@ -75,6 +77,20 @@ export default async function QuoteDetailPage({
                 Apply change
               </SubmitButton>
             </form>
+          </Panel>
+
+          {/* Build spec */}
+          <Panel title="Build spec">
+            <p className="mb-3 text-xs text-zinc-400">
+              The structured spec extracted from the customer&apos;s documents. Edit it
+              and regenerate to keep the quote in sync.
+            </p>
+            <Link
+              href={`/quotes/${quote.id}/spec`}
+              className="block w-full rounded-md bg-white/10 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              View / edit build spec →
+            </Link>
           </Panel>
 
           {/* Export */}

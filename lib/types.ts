@@ -47,9 +47,77 @@ export interface Quote {
   truck_type: TruckType;
   requirements: string;
   quote_data: QuoteData;
+  build_spec: BuildSpec;
   revisions: QuoteRevision[];
   ai_provider: string;
   ai_model: string;
+}
+
+// ----- Build spec -----------------------------------------------------------
+// Structured representation of what the customer wants, extracted by the AI
+// from uploaded documents/emails. Drives both the quote and (Phase 3) the 3D
+// configurator, so the picture always matches the numbers.
+
+export interface SpecEquipment {
+  name: string; // e.g. "Flat-top griddle"
+  type: string; // e.g. "cooking" | "refrigeration" | "sink" | "prep" | ...
+  location: string; // e.g. "street-side galley", "rear"
+  specs: string; // free-form notes (size, fuel, capacity)
+}
+
+export type ServingWindowSide = "street" | "curb" | "rear" | "front";
+
+export interface ServingWindow {
+  side: ServingWindowSide;
+  widthIn: number; // approximate opening width in inches
+}
+
+export interface BuildSpec {
+  summary: string; // one-paragraph plain-language summary of the build
+  truckType: TruckType;
+  baseVehicle: string; // e.g. "22ft step van", "concession trailer"
+  dimensions: {
+    lengthFt: number;
+    widthFt: number;
+    heightFt: number;
+  };
+  equipment: SpecEquipment[];
+  power: {
+    generatorKw: number; // 0 if none
+    shorePower: boolean;
+    batteries: boolean;
+    solar: boolean;
+    notes: string;
+  };
+  plumbing: {
+    freshTankGal: number;
+    greyTankGal: number;
+    sinks: number;
+    waterHeater: boolean;
+    notes: string;
+  };
+  exterior: {
+    paintColor: string;
+    wrap: string; // description of wrap / graphics
+    servingWindows: ServingWindow[];
+  };
+  interior: {
+    flooring: string;
+    finishes: string;
+  };
+  mustHaves: string[]; // explicit customer requirements
+  openQuestions: string[]; // gaps the estimator should clarify
+}
+
+export interface BuildDocument {
+  id: string;
+  created_at: string;
+  quote_id: string | null;
+  filename: string;
+  mime_type: string;
+  storage_path: string;
+  size_bytes: number;
+  extracted_text: string;
 }
 
 export type DocType = "quote" | "email" | "pricing" | "documentation";

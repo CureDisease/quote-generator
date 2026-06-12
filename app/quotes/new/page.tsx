@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { createQuoteAction } from "@/app/actions";
+import { intakeQuoteAction } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { getSettings } from "@/lib/data";
 import { TRUCK_TYPE_LABELS, type TruckType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const ACCEPT =
+  ".pdf,.docx,.eml,.msg,.txt,.md,.csv,.png,.jpg,.jpeg,.gif,.webp,application/pdf,image/*";
 
 export default async function NewQuotePage({
   searchParams,
@@ -23,9 +26,10 @@ export default async function NewQuotePage({
         </Link>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">New Quote</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Enter what the customer wants. The{" "}
-          {connected ? `connected AI (${settings.provider})` : "built-in sample estimator"} will
-          draft an itemized quote you can refine.
+          Upload the customer&apos;s emails and documents, or describe what they want.
+          The {connected ? `connected AI (${settings.provider})` : "built-in sample estimator"}{" "}
+          will read everything and produce a structured build spec you can review before
+          the quote is generated.
         </p>
       </div>
 
@@ -35,7 +39,7 @@ export default async function NewQuotePage({
         </div>
       ) : null}
 
-      <form action={createQuoteAction} className="space-y-5">
+      <form action={intakeQuoteAction} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Customer name">
             <input
@@ -72,11 +76,24 @@ export default async function NewQuotePage({
           </Field>
         </div>
 
-        <Field label="What does the customer want?">
+        <Field label="Customer emails & documents (optional)">
+          <input
+            type="file"
+            name="documents"
+            multiple
+            accept={ACCEPT}
+            className="block w-full cursor-pointer rounded-lg border border-dashed border-white/20 bg-white/[0.02] px-3 py-4 text-sm text-zinc-300 file:mr-4 file:rounded-md file:border-0 file:bg-amber-brand file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-black hover:border-amber-brand/50"
+          />
+          <p className="mt-1.5 text-xs text-zinc-500">
+            PDFs, Word docs (.docx), emails (.eml/.msg), images of sketches or
+            reference trucks, and plain text. Up to 10 files, 10MB each.
+          </p>
+        </Field>
+
+        <Field label="What does the customer want? (optional if documents cover it)">
           <textarea
             name="requirements"
-            rows={7}
-            required
+            rows={5}
             placeholder="e.g. A 20ft food truck for Tex-Mex. Needs a flat-top griddle, double fryer, 6-burner range, reach-in fridge + freezer, a service window on the passenger side, onboard generator, and a bold red & gold wrap. Budget around $95k."
             className="input"
           />
@@ -90,7 +107,9 @@ export default async function NewQuotePage({
             </Link>
             .
           </p>
-          <SubmitButton pendingLabel="Generating quote…">Generate quote</SubmitButton>
+          <SubmitButton pendingLabel="Reading documents…">
+            Extract build spec →
+          </SubmitButton>
         </div>
       </form>
 

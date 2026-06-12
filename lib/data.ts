@@ -1,8 +1,11 @@
 import "server-only";
 import { getSupabase } from "./supabase";
 import { normalizeQuoteData } from "./quote";
+import { normalizeBuildSpec } from "./spec";
 import type {
   AiSettings,
+  BuildDocument,
+  BuildSpec,
   Quote,
   QuoteData,
   QuoteStatus,
@@ -111,6 +114,7 @@ export async function insertQuote(q: {
   truck_type: string;
   requirements: string;
   quote_data: QuoteData;
+  build_spec?: BuildSpec;
   ai_provider: string;
   ai_model: string;
 }): Promise<string> {
@@ -128,6 +132,7 @@ export async function updateQuote(
   id: string,
   patch: {
     quote_data?: QuoteData;
+    build_spec?: BuildSpec;
     status?: QuoteStatus;
     ai_provider?: string;
     ai_model?: string;
@@ -137,7 +142,53 @@ export async function updateQuote(
   const sb = getSupabase();
   const out: Record<string, unknown> = { ...patch };
   if (patch.quote_data) out.quote_data = normalizeQuoteData(patch.quote_data);
+  if (patch.build_spec) out.build_spec = normalizeBuildSpec(patch.build_spec);
   await sb.from("quotes").update(out).eq("id", id);
+}
+
+// ----- Build documents (customer uploads) -----------------------------------
+
+const DOCS_BUCKET = "build-documents";
+
+export async function uploadBuildDocument(doc: {
+  quote_id: string;
+  filename: string;
+  mime_type: string;
+  bytes: Buffer;
+  extracted_text: string;
+}): Promise<void> {
+  const sb = getSupabase();
+  // Keep paths unique + free of exotic characters.
+  const safeName = doc.filename.replace(/[^\w.\-]+/g, "_").slice(-100);
+  const storage_path = `${doc.quote_id}/${Date.now()}-${safeName}`;
+
+  const { error: upErr } = await sb.storage
+    .from(DOCS_BUCKET)
+    .upload(storage_path, doc.bytes, {
+      contentType: doc.mime_type || "application/octet-stream",
+    });
+  // Keep the metadata row even if the blob upload fails — the extracted text
+  // is the part the AI actually used.
+  await sb.from("build_documents").insert({
+    quote_id: doc.quote_id,
+    filename: doc.filename,
+    mime_type: doc.mime_type,
+    storage_path: upErr ? "" : storage_path,
+    size_bytes: doc.bytes.byteLength,
+    extracted_text: doc.extracted_text,
+  });
+}
+
+export async function listBuildDocuments(
+  quoteId: string,
+): Promise<BuildDocument[]> {
+  const sb = getSupabase();
+  const { data } = await sb
+    .from("build_documents")
+    .select("*")
+    .eq("quote_id", quoteId)
+    .order("created_at", { ascending: true });
+  return (data as BuildDocument[]) ?? [];
 }
 
 export async function deleteQuote(id: string): Promise<void> {

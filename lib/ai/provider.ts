@@ -1,5 +1,6 @@
 import type {
   AiSettings,
+  BuildSpec,
   QuoteData,
   TrainingDocument,
   TruckType,
@@ -12,8 +13,31 @@ export interface QuoteContext {
   customerContact: string;
   truckType: TruckType;
   requirements: string;
+  // Structured build spec (extracted from uploaded documents), when available,
+  // so the generated quote reflects it.
+  spec?: BuildSpec;
   // Active knowledge-base documents (prior quotes, emails, pricing, docs)
   // that "train" / steer the connected AI.
+  knowledge: TrainingDocument[];
+  settings: AiSettings;
+}
+
+// A single uploaded document handed to the extractor: either extracted text or
+// a Claude-native media block (PDF / image).
+export interface ExtractDoc {
+  filename: string;
+  text: string;
+  media?: { kind: "pdf" | "image"; base64: string; mediaType: string };
+}
+
+// The request for turning uploaded customer documents into a structured spec.
+export interface ExtractContext {
+  customerName: string;
+  customerCompany: string;
+  customerContact: string;
+  truckType: TruckType;
+  requirements: string; // any free-text the estimator typed alongside uploads
+  documents: ExtractDoc[];
   knowledge: TrainingDocument[];
   settings: AiSettings;
 }
@@ -23,6 +47,13 @@ export interface AiResult {
   provider: string;
   model: string;
   note?: string; // optional human-readable note (e.g. "running on sample data")
+}
+
+export interface SpecResult {
+  spec: BuildSpec;
+  provider: string;
+  model: string;
+  note?: string;
 }
 
 /**
@@ -38,6 +69,8 @@ export interface QuoteAiProvider {
     instruction: string,
     ctx: QuoteContext,
   ): Promise<AiResult>;
+  // Read uploaded customer documents and produce a structured build spec.
+  extractSpec(ctx: ExtractContext): Promise<SpecResult>;
 }
 
 // Builds the reference-context block from active knowledge documents.
