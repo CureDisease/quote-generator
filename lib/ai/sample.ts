@@ -3,11 +3,52 @@ import { normalizeQuoteData } from "../quote";
 import { normalizeBuildSpec } from "../spec";
 import type {
   AiResult,
+  CatalogExtractContext,
+  CatalogResult,
   ExtractContext,
+  ExtractedCatalogItem,
   QuoteAiProvider,
   QuoteContext,
   SpecResult,
 } from "./provider";
+
+// Common equipment the sample extractor can recognize in knowledge-base text,
+// with rough dimensions/prices so the gallery is usable before an AI is connected.
+const CATALOG_KEYWORDS: (ExtractedCatalogItem & { match: RegExp })[] = [
+  { match: /flat[\s-]?top|griddle/i, name: "Flat-top griddle", category: "cooking", length_ft: 3, depth_ft: 2.2, height_ft: 1.5, unit_price: 2200, power_watts: 0, tags: ["gas"], notes: "" },
+  { match: /\bfryer\b/i, name: "Deep fryer", category: "cooking", length_ft: 1.5, depth_ft: 2.2, height_ft: 3, unit_price: 1600, power_watts: 0, tags: ["gas"], notes: "" },
+  { match: /6[\s-]?burner|range\b/i, name: "6-burner range + oven", category: "cooking", length_ft: 3, depth_ft: 2.4, height_ft: 3, unit_price: 3800, power_watts: 0, tags: ["gas"], notes: "" },
+  { match: /char[\s-]?broiler|char grill/i, name: "Charbroiler", category: "cooking", length_ft: 2, depth_ft: 2.2, height_ft: 1.5, unit_price: 1900, power_watts: 0, tags: ["gas"], notes: "" },
+  { match: /vent hood|exhaust hood|hood\b/i, name: "Commercial vent hood", category: "ventilation", length_ft: 6, depth_ft: 2.5, height_ft: 1.2, unit_price: 6900, power_watts: 600, tags: ["fire-suppression"], notes: "" },
+  { match: /reach[\s-]?in|refrigerator|fridge/i, name: "Reach-in refrigerator", category: "refrigeration", length_ft: 2.5, depth_ft: 2.6, height_ft: 6.5, unit_price: 3400, power_watts: 800, tags: [], notes: "" },
+  { match: /freezer/i, name: "Reach-in freezer", category: "refrigeration", length_ft: 2.5, depth_ft: 2.6, height_ft: 6.5, unit_price: 3900, power_watts: 1000, tags: [], notes: "" },
+  { match: /under[\s-]?counter (fridge|refrigerat)/i, name: "Undercounter refrigeration", category: "refrigeration", length_ft: 3, depth_ft: 2.4, height_ft: 3, unit_price: 2600, power_watts: 600, tags: [], notes: "" },
+  { match: /3[\s-]?comp|three[\s-]?comp|compartment sink/i, name: "3-compartment sink", category: "sink", length_ft: 4, depth_ft: 2, height_ft: 3, unit_price: 1400, power_watts: 0, tags: [], notes: "" },
+  { match: /hand[\s-]?sink|hand wash/i, name: "Hand sink", category: "sink", length_ft: 1.2, depth_ft: 1.2, height_ft: 3, unit_price: 350, power_watts: 0, tags: [], notes: "" },
+  { match: /prep table|stainless table|work table/i, name: "Stainless prep table", category: "prep", length_ft: 4, depth_ft: 2.2, height_ft: 3, unit_price: 700, power_watts: 0, tags: [], notes: "" },
+  { match: /espresso/i, name: "Dual-group espresso machine", category: "cooking", length_ft: 2.5, depth_ft: 2, height_ft: 1.5, unit_price: 9500, power_watts: 3000, tags: ["electric"], notes: "" },
+  { match: /grinder/i, name: "Coffee grinder", category: "prep", length_ft: 0.7, depth_ft: 0.7, height_ft: 1.5, unit_price: 800, power_watts: 500, tags: ["electric"], notes: "" },
+  { match: /generator/i, name: "Onboard generator", category: "equipment", length_ft: 2.5, depth_ft: 2, height_ft: 2, unit_price: 6200, power_watts: 0, tags: ["power"], notes: "" },
+];
+
+function sampleCatalogFromKnowledge(
+  ctx: CatalogExtractContext,
+): ExtractedCatalogItem[] {
+  const text = ctx.knowledge
+    .map((d) => d.content)
+    .join("\n")
+    .toLowerCase();
+  const have = new Set(ctx.existingNames.map((n) => n.toLowerCase()));
+  const out: ExtractedCatalogItem[] = [];
+  for (const k of CATALOG_KEYWORDS) {
+    if (!k.match.test(text)) continue;
+    if (have.has(k.name.toLowerCase())) continue;
+    const { match, ...item } = k;
+    void match;
+    out.push(item);
+  }
+  return out;
+}
 
 // Rough base build-out templates per truck type. This is intentionally simple,
 // deterministic placeholder logic so the dashboard's full flow works BEFORE a
@@ -145,6 +186,18 @@ export const sampleProvider: QuoteAiProvider = {
       provider: "sample",
       model: "built-in-estimator",
       note: "Sample extractor produced a starter spec from the build type. Connect an AI provider to read your uploaded documents.",
+    };
+  },
+
+  async extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult> {
+    const items = sampleCatalogFromKnowledge(ctx);
+    return {
+      items,
+      provider: "sample",
+      model: "built-in-estimator",
+      note: items.length
+        ? "Sample extractor matched common equipment in your knowledge base. Connect an AI provider for full extraction with your real prices."
+        : "No common equipment recognized. Add knowledge-base documents (pricing sheets, prior quotes) or add catalog items manually.",
     };
   },
 

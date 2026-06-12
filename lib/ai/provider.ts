@@ -1,6 +1,7 @@
 import type {
   AiSettings,
   BuildSpec,
+  CatalogItem,
   QuoteData,
   TrainingDocument,
   TruckType,
@@ -56,6 +57,34 @@ export interface SpecResult {
   note?: string;
 }
 
+// A catalog item proposed by extraction — id/timestamps/source assigned on save.
+export type ExtractedCatalogItem = Pick<
+  CatalogItem,
+  | "name"
+  | "category"
+  | "length_ft"
+  | "depth_ft"
+  | "height_ft"
+  | "unit_price"
+  | "power_watts"
+  | "tags"
+  | "notes"
+>;
+
+export interface CatalogExtractContext {
+  knowledge: TrainingDocument[];
+  // Names already in the catalog so the AI extends rather than repeats.
+  existingNames: string[];
+  settings: AiSettings;
+}
+
+export interface CatalogResult {
+  items: ExtractedCatalogItem[];
+  provider: string;
+  model: string;
+  note?: string;
+}
+
 /**
  * Every AI integration implements this. Swapping the model the company "trains"
  * and uses is a matter of adding one of these and selecting it in settings —
@@ -71,6 +100,9 @@ export interface QuoteAiProvider {
   ): Promise<AiResult>;
   // Read uploaded customer documents and produce a structured build spec.
   extractSpec(ctx: ExtractContext): Promise<SpecResult>;
+  // Read the knowledge base (pricing sheets, prior quotes) and extract
+  // distinct equipment items for the builder's gallery catalog.
+  extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult>;
 }
 
 // Builds the reference-context block from active knowledge documents.

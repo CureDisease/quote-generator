@@ -120,6 +120,37 @@ export interface BuildDocument {
   extracted_text: string;
 }
 
+// ----- Equipment catalog ------------------------------------------------------
+
+export const EQUIPMENT_CATEGORIES = [
+  "cooking",
+  "refrigeration",
+  "sink",
+  "prep",
+  "ventilation",
+  "storage",
+  "equipment",
+] as const;
+
+export type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
+
+export interface CatalogItem {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  category: EquipmentCategory;
+  length_ft: number; // along the wall
+  depth_ft: number; // into the galley
+  height_ft: number;
+  unit_price: number;
+  power_watts: number; // 0 = no electrical load
+  tags: string[];
+  notes: string;
+  source: "manual" | "extracted";
+  active: boolean;
+}
+
 export type DocType = "quote" | "email" | "pricing" | "documentation";
 
 export interface TrainingDocument {

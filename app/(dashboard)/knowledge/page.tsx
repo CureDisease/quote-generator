@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { getSettings, listKnowledge } from "@/lib/data";
+import { getSettings, listCatalog, listKnowledge } from "@/lib/data";
 import { availableProviders } from "@/lib/ai";
 import { SubmitButton } from "@/components/SubmitButton";
+import { CatalogManager } from "@/components/CatalogManager";
 import {
   addKnowledgeAction,
   deleteKnowledgeAction,
@@ -15,10 +16,22 @@ export const dynamic = "force-dynamic";
 export default async function KnowledgePage({
   searchParams,
 }: {
-  searchParams: { saved?: string };
+  searchParams: { saved?: string; catalog?: string; note?: string; error?: string };
 }) {
-  const [settings, docs] = await Promise.all([getSettings(), listKnowledge()]);
+  const [settings, docs, catalog] = await Promise.all([
+    getSettings(),
+    listKnowledge(),
+    listCatalog(),
+  ]);
   const providers = availableProviders();
+  const catalogResult =
+    searchParams.error || searchParams.catalog != null
+      ? {
+          added: searchParams.catalog != null ? Number(searchParams.catalog) : undefined,
+          note: searchParams.note,
+          error: searchParams.error,
+        }
+      : undefined;
 
   return (
     <div className="space-y-8">
@@ -70,7 +83,7 @@ export default async function KnowledgePage({
                 <input
                   name="model"
                   defaultValue={settings.model}
-                  placeholder="claude-opus-4-8"
+                  placeholder="claude-fable-5"
                   className="kinput"
                 />
               </Field>
@@ -111,7 +124,7 @@ export default async function KnowledgePage({
             <div className="flex items-center justify-between">
               <p className="text-xs text-zinc-500">
                 For Claude, set provider to <code>anthropic</code>, model{" "}
-                <code>claude-opus-4-8</code>, and add <code>ANTHROPIC_API_KEY</code> in the
+                <code>claude-fable-5</code>, and add <code>ANTHROPIC_API_KEY</code> in the
                 environment.
               </p>
               <SubmitButton pendingLabel="Saving…">Save behavior</SubmitButton>
@@ -240,6 +253,8 @@ export default async function KnowledgePage({
           </div>
         )}
       </section>
+
+      <CatalogManager items={catalog} result={catalogResult} />
 
       <style>{`
         .kinput {

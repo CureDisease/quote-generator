@@ -5,11 +5,15 @@ import { normalizeBuildSpec, specToPromptText } from "../spec";
 import {
   buildKnowledgeBlock,
   type AiResult,
+  type CatalogExtractContext,
+  type CatalogResult,
   type ExtractContext,
+  type ExtractedCatalogItem,
   type QuoteAiProvider,
   type QuoteContext,
   type SpecResult,
 } from "./provider";
+import { EQUIPMENT_CATEGORIES, type EquipmentCategory } from "../types";
 
 const DEFAULT_MODEL = "claude-fable-5";
 
@@ -177,7 +181,9 @@ function parseSpec(text: string, ctx: ExtractContext): SpecResult["spec"] {
   );
 }
 
-function createClient(ctx: QuoteContext | ExtractContext): Anthropic {
+function createClient(ctx: {
+  settings: { base_url?: string };
+}): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -215,8 +221,91 @@ async function complete(
     .join("\n");
 }
 
+// ----- Catalog extraction ----------------------------------------------------
+
+const CATALOG_SCHEMA_INSTRUCTIONS = `
+Return ONLY a single JSON object (no prose, no markdown fences) with this shape:
+{ "items": [
+  {
+    "name": string,             // canonical equipment name, e.g. "6-burner range + oven"
+    "category": "cooking" | "refrigeration" | "sink" | "prep" | "ventilation" | "storage" | "equipment",
+    "length_ft": number,        // footprint along the galley wall
+    "depth_ft": number,         // footprint into the galley
+    "height_ft": number,
+    "unit_price": number,       // USD, from the company's own pricing where present
+    "power_watts": number,      // electrical draw, 0 for gas/none
+    "tags": [string],
+    "notes": string
+  }
+] }
+Extract DISTINCT equipment items only (not labor, permits, or whole builds).
+Prefer prices found in the documents. Use realistic dimensions. Skip items
+already present in the existing catalog list.
+`.trim();
+
+function catalogSystemPrompt(ctx: CatalogExtractContext): string {
+  return [
+    "You build an equipment catalog for a custom-truck fabrication shop.",
+    "Read the company's reference documents (pricing sheets, prior quotes, specs) and extract the distinct pieces of equipment they install, with the company's own prices and realistic physical dimensions.",
+    "",
+    "REFERENCE DOCUMENTS:",
+    buildKnowledgeBlock(ctx.knowledge),
+    "",
+    `ALREADY IN CATALOG (do not repeat these): ${
+      ctx.existingNames.length ? ctx.existingNames.join(", ") : "(none)"
+    }`,
+    "",
+    CATALOG_SCHEMA_INSTRUCTIONS,
+  ].join("\n");
+}
+
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function parseCatalog(text: string): ExtractedCatalogItem[] {
+  const raw = extractJson(text) as { items?: unknown };
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  return items
+    .map((it): ExtractedCatalogItem => {
+      const o = (it ?? {}) as Record<string, unknown>;
+      const category = (
+        EQUIPMENT_CATEGORIES as readonly string[]
+      ).includes(String(o.category))
+        ? (o.category as EquipmentCategory)
+        : "equipment";
+      return {
+        name: String(o.name ?? "").trim(),
+        category,
+        length_ft: num(o.length_ft, 3),
+        depth_ft: num(o.depth_ft, 2.2),
+        height_ft: num(o.height_ft, 3),
+        unit_price: num(o.unit_price, 0),
+        power_watts: num(o.power_watts, 0),
+        tags: Array.isArray(o.tags)
+          ? o.tags.map((t) => String(t).trim()).filter(Boolean)
+          : [],
+        notes: String(o.notes ?? "").trim(),
+      };
+    })
+    .filter((i) => i.name.length > 0);
+}
+
 export const anthropicProvider: QuoteAiProvider = {
   name: "anthropic",
+
+  async extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult> {
+    const client = createClient(ctx);
+    const model = ctx.settings.model?.trim() || DEFAULT_MODEL;
+    const text = await complete(
+      client,
+      model,
+      catalogSystemPrompt(ctx),
+      "Extract the equipment catalog from the reference documents.",
+    );
+    return { items: parseCatalog(text), provider: "anthropic", model };
+  },
 
   async extractSpec(ctx: ExtractContext): Promise<SpecResult> {
     const client = createClient(ctx);

@@ -6,11 +6,13 @@ import type {
   AiSettings,
   BuildDocument,
   BuildSpec,
+  CatalogItem,
   Quote,
   QuoteData,
   QuoteStatus,
   TrainingDocument,
 } from "./types";
+import type { ExtractedCatalogItem } from "./ai/provider";
 
 // ----- AI settings (single row) --------------------------------------------
 
@@ -191,6 +193,101 @@ export async function getQuoteShare(
     .eq("id", id)
     .maybeSingle();
   return (data as { share_token: string; share_enabled: boolean }) ?? null;
+}
+
+// ----- Equipment catalog -----------------------------------------------------
+
+export async function listCatalog(
+  opts: { activeOnly?: boolean } = {},
+): Promise<CatalogItem[]> {
+  const sb = getSupabase();
+  let query = sb
+    .from("equipment_catalog")
+    .select("*")
+    .order("category", { ascending: true })
+    .order("name", { ascending: true });
+  if (opts.activeOnly) query = query.eq("active", true);
+  const { data } = await query;
+  return (data as CatalogItem[]) ?? [];
+}
+
+export async function addCatalogItem(
+  item: ExtractedCatalogItem & { source?: CatalogItem["source"] },
+): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("equipment_catalog").insert({
+    name: item.name,
+    category: item.category,
+    length_ft: item.length_ft,
+    depth_ft: item.depth_ft,
+    height_ft: item.height_ft,
+    unit_price: item.unit_price,
+    power_watts: item.power_watts,
+    tags: item.tags,
+    notes: item.notes,
+    source: item.source ?? "manual",
+  });
+}
+
+/**
+ * Insert extracted items, skipping any whose name already exists (the unique
+ * index is case-insensitive). Returns the count actually added.
+ */
+export async function mergeCatalogItems(
+  items: ExtractedCatalogItem[],
+): Promise<number> {
+  if (!items.length) return 0;
+  const sb = getSupabase();
+  const existing = await listCatalog();
+  const have = new Set(existing.map((i) => i.name.toLowerCase()));
+  const fresh = items.filter((i) => !have.has(i.name.toLowerCase()));
+  if (!fresh.length) return 0;
+  const { error } = await sb.from("equipment_catalog").insert(
+    fresh.map((i) => ({
+      name: i.name,
+      category: i.category,
+      length_ft: i.length_ft,
+      depth_ft: i.depth_ft,
+      height_ft: i.height_ft,
+      unit_price: i.unit_price,
+      power_watts: i.power_watts,
+      tags: i.tags,
+      notes: i.notes,
+      source: "extracted" as const,
+    })),
+  );
+  if (error) throw new Error(error.message);
+  return fresh.length;
+}
+
+export async function updateCatalogItem(
+  id: string,
+  patch: Partial<
+    Pick<
+      CatalogItem,
+      | "name"
+      | "category"
+      | "length_ft"
+      | "depth_ft"
+      | "height_ft"
+      | "unit_price"
+      | "power_watts"
+      | "tags"
+      | "notes"
+      | "active"
+    >
+  >,
+): Promise<void> {
+  const sb = getSupabase();
+  await sb
+    .from("equipment_catalog")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", id);
+}
+
+export async function deleteCatalogItem(id: string): Promise<void> {
+  const sb = getSupabase();
+  await sb.from("equipment_catalog").delete().eq("id", id);
 }
 
 // ----- Build documents (customer uploads) -----------------------------------

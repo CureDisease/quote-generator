@@ -3,15 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addCatalogItem,
   addKnowledge,
+  deleteCatalogItem,
   deleteKnowledge,
   deleteQuote,
   getActiveKnowledge,
   getQuote,
   getSettings,
   insertQuote,
+  listCatalog,
+  mergeCatalogItems,
   setKnowledgeActive,
   setQuoteShareEnabled,
+  updateCatalogItem,
   updateQuote,
   updateSettings,
   uploadBuildDocument,
@@ -23,6 +28,7 @@ import { specFromForm } from "@/lib/spec";
 import type {
   AiProviderName,
   BuildSpec,
+  CatalogItem,
   DocType,
   QuoteStatus,
   TruckType,
@@ -285,6 +291,84 @@ export async function deleteKnowledgeAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await deleteKnowledge(id);
   revalidatePath("/knowledge");
+}
+
+// ----- Equipment catalog -----------------------------------------------------
+
+export async function extractCatalogAction() {
+  const [settings, knowledge, existing] = await Promise.all([
+    getSettings(),
+    getActiveKnowledge(),
+    listCatalog(),
+  ]);
+  const provider = providerFor(settings);
+  let added = 0;
+  let note = "";
+  try {
+    const result = await provider.extractCatalog({
+      knowledge,
+      existingNames: existing.map((i) => i.name),
+      settings,
+    });
+    added = await mergeCatalogItems(result.items);
+    note = result.note ?? "";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Extraction failed";
+    revalidatePath("/knowledge");
+    redirect(`/knowledge?error=${encodeURIComponent(msg)}#catalog`);
+  }
+  revalidatePath("/knowledge");
+  redirect(
+    `/knowledge?catalog=${added}&note=${encodeURIComponent(note)}#catalog`,
+  );
+}
+
+export async function addCatalogItemAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) redirect("/knowledge#catalog");
+  await addCatalogItem({
+    name,
+    category: String(formData.get("category") ?? "equipment") as CatalogItem["category"],
+    length_ft: Number(formData.get("length_ft") ?? 3) || 3,
+    depth_ft: Number(formData.get("depth_ft") ?? 2.2) || 2.2,
+    height_ft: Number(formData.get("height_ft") ?? 3) || 3,
+    unit_price: Number(formData.get("unit_price") ?? 0) || 0,
+    power_watts: Number(formData.get("power_watts") ?? 0) || 0,
+    tags: String(formData.get("tags") ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+    notes: String(formData.get("notes") ?? "").trim(),
+  });
+  revalidatePath("/knowledge");
+  redirect("/knowledge#catalog");
+}
+
+export async function updateCatalogItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/knowledge#catalog");
+  await updateCatalogItem(id, {
+    name: String(formData.get("name") ?? "").trim() || "Untitled",
+    category: String(formData.get("category") ?? "equipment") as CatalogItem["category"],
+    length_ft: Number(formData.get("length_ft") ?? 3) || 3,
+    depth_ft: Number(formData.get("depth_ft") ?? 2.2) || 2.2,
+    height_ft: Number(formData.get("height_ft") ?? 3) || 3,
+    unit_price: Number(formData.get("unit_price") ?? 0) || 0,
+    power_watts: Number(formData.get("power_watts") ?? 0) || 0,
+    tags: String(formData.get("tags") ?? "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean),
+  });
+  revalidatePath("/knowledge");
+  redirect("/knowledge#catalog");
+}
+
+export async function deleteCatalogItemAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  await deleteCatalogItem(id);
+  revalidatePath("/knowledge");
+  redirect("/knowledge#catalog");
 }
 
 // ----- AI behavior / provider settings --------------------------------------
