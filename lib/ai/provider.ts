@@ -100,6 +100,12 @@ export interface QuoteAiProvider {
   ): Promise<AiResult>;
   // Read uploaded customer documents and produce a structured build spec.
   extractSpec(ctx: ExtractContext): Promise<SpecResult>;
+  // Apply a natural-language change to an existing spec (the builder AI box).
+  editSpec(
+    current: BuildSpec,
+    instruction: string,
+    ctx: { truckType: TruckType; knowledge: TrainingDocument[]; settings: AiSettings },
+  ): Promise<SpecResult>;
   // Read the knowledge base (pricing sheets, prior quotes) and extract
   // distinct equipment items for the builder's gallery catalog.
   extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult>;

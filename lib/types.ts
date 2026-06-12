@@ -58,11 +58,24 @@ export interface Quote {
 // from uploaded documents/emails. Drives both the quote and (Phase 3) the 3D
 // configurator, so the picture always matches the numbers.
 
+// Explicit placement of an item in the galley, set in the builder. xFt is the
+// center distance from the FRONT wall along the length; side is which wall.
+export interface ItemPlacement {
+  xFt: number;
+  side: "street" | "curb";
+}
+
 export interface SpecEquipment {
   name: string; // e.g. "Flat-top griddle"
   type: string; // e.g. "cooking" | "refrigeration" | "sink" | "prep" | ...
   location: string; // e.g. "street-side galley", "rear"
   specs: string; // free-form notes (size, fuel, capacity)
+  // Footprint along the wall / into the galley (from the catalog). Optional —
+  // defaults applied by the scene builder when absent.
+  lengthFt?: number;
+  depthFt?: number;
+  // Explicit position set via the builder; auto-packed when absent.
+  position?: ItemPlacement;
 }
 
 export type ServingWindowSide = "street" | "curb" | "rear" | "front";

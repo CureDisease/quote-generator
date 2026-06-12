@@ -142,9 +142,15 @@ export default async function QuoteDetailPage({
           {/* Build spec */}
           <Panel title="Build spec">
             <p className="mb-3 text-xs text-zinc-400">
-              The structured spec extracted from the customer&apos;s documents. Edit it
-              and regenerate to keep the quote in sync.
+              The structured spec extracted from the customer&apos;s documents. Lay it
+              out in the builder, or edit fields directly.
             </p>
+            <Link
+              href={`/quotes/${quote.id}/builder`}
+              className="mb-2 block w-full rounded-md bg-amber-brand px-4 py-2 text-center text-sm font-semibold text-black transition hover:brightness-110"
+            >
+              Open truck builder →
+            </Link>
             <Link
               href={`/quotes/${quote.id}/spec`}
               className="block w-full rounded-md bg-white/10 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-white/15"

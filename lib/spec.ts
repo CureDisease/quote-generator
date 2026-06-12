@@ -27,12 +27,19 @@ function normalizeEquipment(v: unknown): SpecEquipment[] {
   return v
     .map((e) => {
       const o = (e ?? {}) as Partial<SpecEquipment>;
-      return {
+      const item: SpecEquipment = {
         name: str(o.name).trim(),
         type: str(o.type, "equipment").trim() || "equipment",
         location: str(o.location).trim(),
         specs: str(o.specs).trim(),
       };
+      if (o.lengthFt != null) item.lengthFt = num(o.lengthFt, 3);
+      if (o.depthFt != null) item.depthFt = num(o.depthFt, 2.2);
+      const pos = o.position as Partial<SpecEquipment["position"]>;
+      if (pos && (pos.side === "street" || pos.side === "curb")) {
+        item.position = { xFt: num(pos.xFt, 0), side: pos.side };
+      }
+      return item;
     })
     .filter((e) => e.name.length > 0);
 }

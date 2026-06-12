@@ -24,7 +24,7 @@ import {
 import { providerFor } from "@/lib/ai";
 import type { ExtractDoc, QuoteContext } from "@/lib/ai/provider";
 import { parseUploadedFile } from "@/lib/intake/parse";
-import { specFromForm } from "@/lib/spec";
+import { normalizeBuildSpec, specFromForm } from "@/lib/spec";
 import type {
   AiProviderName,
   BuildSpec,
@@ -240,6 +240,91 @@ export async function refineQuoteAction(formData: FormData) {
 
   revalidatePath(`/quotes/${id}`);
   redirect(`/quotes/${id}`);
+}
+
+// ----- Builder (interactive layout) -----------------------------------------
+
+export async function saveBuilderSpec(
+  quoteId: string,
+  specJson: string,
+  reprice: boolean,
+): Promise<{ ok: boolean; error?: string }> {
+  const quote = await getQuote(quoteId);
+  if (!quote) return { ok: false, error: "Quote not found." };
+
+  let spec: BuildSpec;
+  try {
+    spec = normalizeBuildSpec(JSON.parse(specJson), quote.truck_type);
+  } catch {
+    return { ok: false, error: "Could not read the layout." };
+  }
+
+  if (!reprice) {
+    await updateQuote(quoteId, { build_spec: spec });
+    revalidatePath(`/quotes/${quoteId}`);
+    return { ok: true };
+  }
+
+  const ctx = await buildContext({
+    customerName: quote.customer_name,
+    customerCompany: quote.customer_company,
+    customerContact: quote.customer_contact,
+    truckType: spec.truckType,
+    requirements: quote.requirements,
+    spec,
+  });
+  try {
+    const result = await providerFor(ctx.settings).generate(ctx);
+    await updateQuote(quoteId, {
+      build_spec: spec,
+      quote_data: result.quote,
+      ai_provider: result.provider,
+      ai_model: result.model,
+    });
+  } catch (err) {
+    await updateQuote(quoteId, { build_spec: spec });
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Re-pricing failed (layout saved).",
+    };
+  }
+  revalidatePath(`/quotes/${quoteId}`);
+  return { ok: true };
+}
+
+export async function aiEditSpec(
+  quoteId: string,
+  specJson: string,
+  instruction: string,
+): Promise<{ ok: boolean; spec?: BuildSpec; note?: string; error?: string }> {
+  const quote = await getQuote(quoteId);
+  if (!quote) return { ok: false, error: "Quote not found." };
+  if (!instruction.trim()) return { ok: false, error: "Describe a change first." };
+
+  let current: BuildSpec;
+  try {
+    current = normalizeBuildSpec(JSON.parse(specJson), quote.truck_type);
+  } catch {
+    return { ok: false, error: "Could not read the current layout." };
+  }
+
+  const [settings, knowledge] = await Promise.all([
+    getSettings(),
+    getActiveKnowledge(),
+  ]);
+  try {
+    const result = await providerFor(settings).editSpec(current, instruction, {
+      truckType: current.truckType,
+      knowledge,
+      settings,
+    });
+    return { ok: true, spec: result.spec, note: result.note };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "AI edit failed.",
+    };
+  }
 }
 
 export async function setQuoteShareAction(formData: FormData) {

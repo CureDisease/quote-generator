@@ -132,16 +132,16 @@ export function buildTruckScene(spec: BuildSpec): TruckScene {
   });
 
   // --- equipment layout --------------------------------------------------------
-  // Place blocks in two runs along the interior walls (street run first unless
-  // the item's location mentions the other side), packed front -> rear.
+  // Items with an explicit position (set in the builder) are placed exactly;
+  // the rest auto-pack along the interior walls, front -> rear.
   const equipment: Box[] = [];
   const usableL = L - 2; // keep clear of front/rear walls
-  const depth = Math.min(2.2, W / 3.2); // counter depth
-  // Length consumed along each wall, packed front (+x) toward rear (-x).
+  const defDepth = Math.min(2.2, W / 3.2); // default counter depth
+  // Length consumed along each wall by auto-packed items.
   const consumed: Record<"street" | "curb", number> = { street: 0, curb: 0 };
 
   const items = [...spec.equipment];
-  // Generator + tanks read better as implied items if specified but not listed.
+  // Generator reads better as an implied item if specified but not listed.
   if (spec.power.generatorKw > 0 && !items.some((e) => /generator/i.test(e.name))) {
     items.push({
       name: `Generator (${spec.power.generatorKw}kW)`,
@@ -151,28 +151,41 @@ export function buildTruckScene(spec: BuildSpec): TruckScene {
     });
   }
 
-  for (const item of items.slice(0, 14)) {
-    const side: "street" | "curb" = /curb|passenger|right/i.test(item.location)
-      ? "curb"
-      : /street|driver|left/i.test(item.location)
-        ? "street"
-        : consumed.street <= consumed.curb
-          ? "street"
-          : "curb";
-    const remaining = usableL - consumed[side];
-    const blockL = Math.min(3, remaining);
-    if (blockL < 1.2) continue; // out of room — skip rather than overflow
+  const zFor = (side: "street" | "curb", depth: number) =>
+    side === "street" ? W / 2 - WALL - depth / 2 : -(W / 2 - WALL - depth / 2);
+  // Scene x for a center distance d from the front wall (front is +x at L/2).
+  const xFromFront = (d: number) => clamp(L / 2 - d, -(usableL / 2), usableL / 2);
+
+  for (const item of items.slice(0, 16)) {
     const isVent = item.type?.toLowerCase() === "ventilation";
+    const blockL = clamp(item.lengthFt ?? 3, 0.6, usableL);
+    const depth = clamp(item.depthFt ?? defDepth, 0.6, W - 2 * WALL);
     const h = isVent ? 1.2 : 3;
-    const xPos = usableL / 2 - consumed[side] - blockL / 2;
-    const z = side === "street" ? W / 2 - WALL - depth / 2 : -(W / 2 - WALL - depth / 2);
+    const y = isVent ? floorY + bodyH - 1 : floorY + WALL + h / 2;
+
+    let side: "street" | "curb";
+    let xPos: number;
+    if (item.position) {
+      side = item.position.side;
+      xPos = xFromFront(item.position.xFt);
+    } else {
+      side = /curb|passenger|right/i.test(item.location)
+        ? "curb"
+        : /street|driver|left/i.test(item.location)
+          ? "street"
+          : consumed.street <= consumed.curb
+            ? "street"
+            : "curb";
+      if (usableL - consumed[side] < blockL * 0.6) continue; // out of room
+      xPos = usableL / 2 - consumed[side] - blockL / 2;
+      consumed[side] += blockL + 0.4;
+    }
     equipment.push({
-      position: [xPos, isVent ? floorY + bodyH - 1 : floorY + WALL + h / 2, z],
+      position: [xPos, y, zFor(side, depth)],
       size: [blockL, h, depth],
       color: equipmentColorFor(item.type),
       label: item.name,
     });
-    consumed[side] += blockL + 0.4;
   }
 
   // --- wheels -------------------------------------------------------------------

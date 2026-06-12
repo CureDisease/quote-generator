@@ -94,7 +94,12 @@ Return ONLY a single JSON object (no prose, no markdown fences) with exactly thi
   "baseVehicle": string,          // e.g. "22ft step van", "8.5x20 concession trailer"
   "dimensions": { "lengthFt": number, "widthFt": number, "heightFt": number },
   "equipment": [
-    { "name": string, "type": string, "location": string, "specs": string }
+    {
+      "name": string, "type": string, "location": string, "specs": string,
+      "lengthFt": number,   // optional footprint along the wall — preserve if present
+      "depthFt": number,    // optional footprint into the galley — preserve if present
+      "position": { "xFt": number, "side": "street" | "curb" }  // optional explicit placement — PRESERVE if present
+    }
     // type: one of "cooking" | "refrigeration" | "sink" | "prep" | "ventilation" | "storage" | "equipment"
     // location: where in/on the truck, e.g. "street-side galley", "curb-side bar", "rear"
   ],
@@ -317,6 +322,37 @@ export const anthropicProvider: QuoteAiProvider = {
       extractUserContent(ctx),
     );
     return { spec: parseSpec(text, ctx), provider: "anthropic", model };
+  },
+
+  async editSpec(current, instruction, ctx): Promise<SpecResult> {
+    const client = createClient(ctx);
+    const model = ctx.settings.model?.trim() || DEFAULT_MODEL;
+    const system = [
+      "You are an expert estimator editing a structured truck build specification.",
+      "Apply the requested change and return the COMPLETE updated spec.",
+      "Preserve every field and each equipment item's existing `position` { xFt, side } and `lengthFt`/`depthFt` unless the change is specifically about moving, adding, or removing equipment.",
+      "",
+      "REFERENCE DOCUMENTS (for pricing/terminology):",
+      buildKnowledgeBlock(ctx.knowledge),
+      "",
+      SPEC_SCHEMA_INSTRUCTIONS,
+    ].join("\n");
+    const text = await complete(
+      client,
+      model,
+      system,
+      [
+        "Current spec JSON:",
+        JSON.stringify(current, null, 2),
+        "",
+        `Requested change: ${instruction}`,
+      ].join("\n"),
+    );
+    return {
+      spec: normalizeBuildSpec(extractJson(text) as Partial<BuildSpec>, ctx.truckType),
+      provider: "anthropic",
+      model,
+    };
   },
 
   async generate(ctx: QuoteContext): Promise<AiResult> {

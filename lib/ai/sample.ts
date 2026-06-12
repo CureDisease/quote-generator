@@ -189,6 +189,26 @@ export const sampleProvider: QuoteAiProvider = {
     };
   },
 
+  async editSpec(current, instruction): Promise<SpecResult> {
+    // Without a connected AI, record the request so the loop is visible.
+    const spec = normalizeBuildSpec(
+      {
+        ...current,
+        openQuestions: [
+          ...current.openQuestions,
+          `Requested change (needs connected AI to apply): ${instruction}`,
+        ],
+      },
+      current.truckType,
+    );
+    return {
+      spec,
+      provider: "sample",
+      model: "built-in-estimator",
+      note: "Sample estimator logged your change. Connect an AI provider to apply spec edits automatically.",
+    };
+  },
+
   async extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult> {
     const items = sampleCatalogFromKnowledge(ctx);
     return {
