@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getQuote } from "@/lib/data";
+import { getQuote, getQuoteShare } from "@/lib/data";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { QuoteDocument } from "@/components/QuoteDocument";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TruckPreview } from "@/components/TruckPreview";
 import {
   deleteQuoteAction,
   refineQuoteAction,
+  setQuoteShareAction,
   setQuoteStatusAction,
 } from "@/app/actions";
+import { isBlankSpec, normalizeBuildSpec } from "@/lib/spec";
 import type { QuoteStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +29,10 @@ export default async function QuoteDetailPage({
   if (!quote) notFound();
   // Intake complete but quote not generated yet — review the spec first.
   if (!quote!.quote_data?.lineItems?.length) redirect(`/quotes/${params.id}/spec`);
+
+  const share = await getQuoteShare(params.id);
+  const spec = normalizeBuildSpec(quote!.build_spec, quote!.truck_type);
+  const showTruck = !isBlankSpec(spec);
 
   return (
     <div className="space-y-6">
@@ -44,6 +52,18 @@ export default async function QuoteDetailPage({
       {searchParams.error ? (
         <div className="no-print rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {searchParams.error}
+        </div>
+      ) : null}
+
+      {showTruck ? (
+        <div className="no-print">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Build preview — drag to rotate, scroll to zoom
+          </h2>
+          <TruckPreview
+            spec={spec}
+            className="h-96 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]"
+          />
         </div>
       ) : null}
 
@@ -77,6 +97,46 @@ export default async function QuoteDetailPage({
                 Apply change
               </SubmitButton>
             </form>
+          </Panel>
+
+          {/* Share with customer */}
+          <Panel title="Share with customer">
+            {share?.share_enabled ? (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400">
+                  Anyone with the link can view the quote and the 3D build preview
+                  (read-only).
+                </p>
+                <CopyLinkButton path={`/q/${share.share_token}`} />
+                <form action={setQuoteShareAction}>
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <input type="hidden" name="enabled" value="false" />
+                  <SubmitButton
+                    pendingLabel="Disabling…"
+                    className="w-full rounded-md bg-white/10 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/15"
+                  >
+                    Disable link
+                  </SubmitButton>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400">
+                  Create a read-only link showing the customer their quote and what
+                  the truck will look like.
+                </p>
+                <form action={setQuoteShareAction}>
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <input type="hidden" name="enabled" value="true" />
+                  <SubmitButton
+                    pendingLabel="Creating link…"
+                    className="w-full rounded-md bg-amber-brand px-4 py-2 text-sm font-semibold text-black transition hover:brightness-110"
+                  >
+                    Create shareable link
+                  </SubmitButton>
+                </form>
+              </div>
+            )}
           </Panel>
 
           {/* Build spec */}

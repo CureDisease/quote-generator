@@ -2,8 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { generateQuoteAction } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TruckPreview } from "@/components/TruckPreview";
 import { getQuote, listBuildDocuments } from "@/lib/data";
-import { equipmentToLines, normalizeBuildSpec, windowsToLines } from "@/lib/spec";
+import {
+  equipmentToLines,
+  isBlankSpec,
+  normalizeBuildSpec,
+  windowsToLines,
+} from "@/lib/spec";
 import { TRUCK_TYPE_LABELS, type TruckType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -35,14 +41,26 @@ export default async function SpecReviewPage({
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
           This is what the AI understood from the customer&apos;s documents. Correct
-          anything that&apos;s wrong, then generate the quote — the quote (and later the
-          3D preview) is driven by this spec.
+          anything that&apos;s wrong, then generate the quote — both the quote and the
+          3D preview below are driven by this spec.
         </p>
       </div>
 
       {searchParams.error ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {searchParams.error}
+        </div>
+      ) : null}
+
+      {!isBlankSpec(spec) ? (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Build preview — drag to rotate, scroll to zoom
+          </h3>
+          <TruckPreview spec={spec} />
+          <p className="mt-1.5 text-xs text-zinc-500">
+            The preview updates after you save the spec.
+          </p>
         </div>
       ) : null}
 

@@ -1,11 +1,23 @@
 import { formatMoney, groupByCategory } from "@/lib/quote";
-import { TRUCK_TYPE_LABELS, type Quote, type TruckType } from "@/lib/types";
+import { TRUCK_TYPE_LABELS, type QuoteData, type TruckType } from "@/lib/types";
+
+// Structural subset of Quote — lets internal quotes and the public shared
+// quote (which omits internal fields) both render the same document.
+export interface QuoteDocumentData {
+  id: string;
+  created_at: string;
+  customer_name: string;
+  customer_company: string;
+  customer_contact?: string;
+  truck_type: TruckType;
+  quote_data: QuoteData;
+}
 
 /**
  * A clean, print-ready quote "sheet". White paper styling so it looks like a
  * real document on the dark dashboard and prints/exports to PDF cleanly.
  */
-export function QuoteDocument({ quote }: { quote: Quote }) {
+export function QuoteDocument({ quote }: { quote: QuoteDocumentData }) {
   const q = quote.quote_data;
   const groups = groupByCategory(q.lineItems);
   const created = new Date(quote.created_at).toLocaleDateString("en-US", {

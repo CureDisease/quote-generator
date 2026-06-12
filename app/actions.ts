@@ -11,6 +11,7 @@ import {
   getSettings,
   insertQuote,
   setKnowledgeActive,
+  setQuoteShareEnabled,
   updateQuote,
   updateSettings,
   uploadBuildDocument,
@@ -233,6 +234,13 @@ export async function refineQuoteAction(formData: FormData) {
 
   revalidatePath(`/quotes/${id}`);
   redirect(`/quotes/${id}`);
+}
+
+export async function setQuoteShareAction(formData: FormData) {
+  const id = String(formData.get("quoteId") ?? "");
+  const enabled = String(formData.get("enabled") ?? "false") === "true";
+  await setQuoteShareEnabled(id, enabled);
+  revalidatePath(`/quotes/${id}`);
 }
 
 export async function setQuoteStatusAction(formData: FormData) {

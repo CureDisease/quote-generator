@@ -146,6 +146,53 @@ export async function updateQuote(
   await sb.from("quotes").update(out).eq("id", id);
 }
 
+// ----- Share links -----------------------------------------------------------
+
+export interface SharedQuote {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  status: QuoteStatus;
+  customer_name: string;
+  customer_company: string;
+  truck_type: Quote["truck_type"];
+  quote_data: QuoteData;
+  build_spec: BuildSpec;
+}
+
+/** Public, token-gated read used by the customer-facing share page. */
+export async function getSharedQuote(token: string): Promise<SharedQuote | null> {
+  const sb = getSupabase();
+  const { data } = await sb.rpc("get_shared_quote", { token }).maybeSingle();
+  return (data as SharedQuote) ?? null;
+}
+
+export async function setQuoteShareEnabled(
+  id: string,
+  enabled: boolean,
+): Promise<string | null> {
+  const sb = getSupabase();
+  const { data } = await sb
+    .from("quotes")
+    .update({ share_enabled: enabled })
+    .eq("id", id)
+    .select("share_token")
+    .maybeSingle();
+  return (data as { share_token: string } | null)?.share_token ?? null;
+}
+
+export async function getQuoteShare(
+  id: string,
+): Promise<{ share_token: string; share_enabled: boolean } | null> {
+  const sb = getSupabase();
+  const { data } = await sb
+    .from("quotes")
+    .select("share_token, share_enabled")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as { share_token: string; share_enabled: boolean }) ?? null;
+}
+
 // ----- Build documents (customer uploads) -----------------------------------
 
 const DOCS_BUCKET = "build-documents";
