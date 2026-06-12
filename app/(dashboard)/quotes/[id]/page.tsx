@@ -171,6 +171,12 @@ export default async function QuoteDetailPage({
             >
               Open PDF view →
             </Link>
+            <Link
+              href={`/quotes/${quote.id}/build-sheet`}
+              className="mt-2 block w-full rounded-md bg-white/10 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              Shop build sheet →
+            </Link>
           </Panel>
 
           {/* Status */}

@@ -275,3 +275,41 @@ export function buildTruckScene(
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Number(n) || min));
 }
+
+// ----- Build-sheet helpers ---------------------------------------------------
+
+export interface PlanItem {
+  name: string;
+  type: string;
+  side: "street" | "curb";
+  xFromFrontFt: number; // center distance from the front wall
+  lengthFt: number;
+  depthFt: number;
+}
+
+// Floor-plan placements (feet from the front wall) derived from the same scene
+// the 3D view uses, so the build sheet and the model never disagree.
+export function planFromScene(scene: TruckScene): PlanItem[] {
+  const half = scene.lengthFt / 2;
+  return scene.equipment.map((b) => ({
+    name: b.label ?? "",
+    type: "",
+    side: b.position[2] > 0 ? "street" : "curb",
+    xFromFrontFt: half - b.position[0],
+    lengthFt: b.size[0],
+    depthFt: b.size[2],
+  }));
+}
+
+// Format feet as feet-inches, e.g. 6.5 -> 6' 6".
+export function ftIn(feet: number): string {
+  const sign = feet < 0 ? "-" : "";
+  const f = Math.abs(feet);
+  let ft = Math.floor(f);
+  let inch = Math.round((f - ft) * 12);
+  if (inch === 12) {
+    ft += 1;
+    inch = 0;
+  }
+  return `${sign}${ft}'${inch ? ` ${inch}"` : ""}`;
+}
