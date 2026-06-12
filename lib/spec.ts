@@ -1,10 +1,35 @@
 import type {
   BuildSpec,
+  Decal,
   ServingWindow,
   ServingWindowSide,
   SpecEquipment,
   TruckType,
 } from "./types";
+
+const DECAL_SIDES = ["street", "curb", "rear", "front"] as const;
+
+function normalizeDecals(v: unknown): Decal[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((d, i) => {
+      const o = (d ?? {}) as Partial<Decal>;
+      const side = (DECAL_SIDES as readonly string[]).includes(String(o.side))
+        ? (o.side as Decal["side"])
+        : "street";
+      return {
+        id: str(o.id).trim() || `d${i}`,
+        url: str(o.url).trim(),
+        side,
+        xFt: num(o.xFt, 5),
+        heightFt: num(o.heightFt, 5),
+        widthFt: num(o.widthFt, 3) || 3,
+        aspect: num(o.aspect, 1) || 1,
+        label: str(o.label).trim(),
+      };
+    })
+    .filter((d) => d.url.length > 0);
+}
 
 const SERVING_SIDES: ServingWindowSide[] = ["street", "curb", "rear", "front"];
 
@@ -99,8 +124,10 @@ export function normalizeBuildSpec(
     },
     exterior: {
       paintColor: str(exterior.paintColor).trim(),
+      accentColor: str(exterior.accentColor).trim(),
       wrap: str(exterior.wrap).trim(),
       servingWindows: normalizeServingWindows(exterior.servingWindows),
+      decals: normalizeDecals(exterior.decals),
     },
     interior: {
       flooring: str(interior.flooring).trim(),

@@ -112,8 +112,10 @@ export interface BuildSpec {
   };
   exterior: {
     paintColor: string;
+    accentColor: string; // optional hex/word for a secondary color
     wrap: string; // description of wrap / graphics
     servingWindows: ServingWindow[];
+    decals: Decal[]; // logos / graphics placed on the body
   };
   interior: {
     flooring: string;
@@ -121,6 +123,18 @@ export interface BuildSpec {
   };
   mustHaves: string[]; // explicit customer requirements
   openQuestions: string[]; // gaps the estimator should clarify
+}
+
+// A logo/graphic placed on a body side, positioned in feet.
+export interface Decal {
+  id: string;
+  url: string; // public image URL
+  side: "street" | "curb" | "rear" | "front";
+  xFt: number; // center distance from the front of the body (along length)
+  heightFt: number; // center height above the ground
+  widthFt: number; // rendered width on the panel
+  aspect: number; // height / width of the source image
+  label: string;
 }
 
 export interface BuildDocument {

@@ -428,6 +428,29 @@ export async function uploadBuildDocument(doc: {
   });
 }
 
+const BRAND_BUCKET = "brand-assets";
+
+/** Upload a logo/graphic and return its public URL. */
+export async function uploadBrandAsset(doc: {
+  quote_id: string;
+  filename: string;
+  mime_type: string;
+  bytes: Buffer;
+}): Promise<string> {
+  const sb = getSupabase();
+  const safeName = doc.filename.replace(/[^\w.\-]+/g, "_").slice(-80);
+  const path = `${doc.quote_id}/${Date.now()}-${safeName}`;
+  const { error } = await sb.storage
+    .from(BRAND_BUCKET)
+    .upload(path, doc.bytes, {
+      contentType: doc.mime_type || "image/png",
+      upsert: true,
+    });
+  if (error) throw new Error(error.message);
+  const { data } = sb.storage.from(BRAND_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
 export async function listBuildDocuments(
   quoteId: string,
 ): Promise<BuildDocument[]> {

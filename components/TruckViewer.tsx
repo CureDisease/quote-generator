@@ -1,10 +1,25 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Text } from "@react-three/drei";
-import { useMemo } from "react";
-import { buildTruckScene, type Box, type TruckScene } from "@/lib/truck/model";
+import { OrbitControls, Text, useTexture } from "@react-three/drei";
+import { Suspense, useMemo } from "react";
+import {
+  buildTruckScene,
+  type Box,
+  type SceneDecal,
+  type TruckScene,
+} from "@/lib/truck/model";
 import type { BuildSpec, VehicleModel } from "@/lib/types";
+
+function DecalPlane({ decal }: { decal: SceneDecal }) {
+  const tex = useTexture(decal.url);
+  return (
+    <mesh position={decal.position} rotation={[0, decal.rotationY, 0]}>
+      <planeGeometry args={[decal.width, decal.height]} />
+      <meshBasicMaterial map={tex} transparent toneMapped={false} />
+    </mesh>
+  );
+}
 
 function BoxMesh({ box }: { box: Box }) {
   return (
@@ -70,6 +85,11 @@ function TruckModel({ scene }: { scene: TruckScene }) {
           <meshStandardMaterial color={w.color} roughness={0.9} />
         </mesh>
       ))}
+      <Suspense fallback={null}>
+        {scene.decals.map((d, i) => (
+          <DecalPlane key={`decal-${i}-${d.url}`} decal={d} />
+        ))}
+      </Suspense>
     </group>
   );
 }

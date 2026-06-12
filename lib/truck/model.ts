@@ -19,17 +19,29 @@ export interface Cylinder {
   color: string;
 }
 
+// A logo/graphic textured onto a body panel.
+export interface SceneDecal {
+  url: string;
+  position: [number, number, number];
+  width: number;
+  height: number;
+  rotationY: number;
+  label: string;
+}
+
 export interface TruckScene {
   lengthFt: number;
   widthFt: number;
   heightFt: number;
   bodyColor: string;
+  accentColor: string;
   isTrailer: boolean;
   body: Box[]; // shell panels (semi-transparent so equipment shows)
   cab: Box[];
   windows: Box[]; // serving windows inset into the walls
   equipment: Box[];
   wheels: Cylinder[];
+  decals: SceneDecal[];
   floorY: number;
 }
 
@@ -52,12 +64,26 @@ const COLOR_WORDS: [RegExp, string][] = [
   [/\bbrown|copper\b/i, "#92400e"],
 ];
 
-export function bodyColorFor(spec: BuildSpec): string {
-  const text = `${spec.exterior.paintColor} ${spec.exterior.wrap}`;
-  for (const [re, hex] of COLOR_WORDS) {
-    if (re.test(text)) return hex;
+const HEX = /#[0-9a-f]{6}\b/i;
+
+function colorFrom(text: string, fallback: string): string {
+  const hex = text.match(HEX);
+  if (hex) return hex[0];
+  for (const [re, c] of COLOR_WORDS) {
+    if (re.test(text)) return c;
   }
-  return "#d4d4d8"; // unpainted aluminum
+  return fallback;
+}
+
+export function bodyColorFor(spec: BuildSpec): string {
+  return colorFrom(
+    `${spec.exterior.paintColor} ${spec.exterior.wrap}`,
+    "#d4d4d8", // unpainted aluminum
+  );
+}
+
+export function accentColorFor(spec: BuildSpec): string {
+  return colorFrom(spec.exterior.accentColor, bodyColorFor(spec));
 }
 
 // Equipment block color by type.
@@ -91,12 +117,13 @@ export function buildTruckScene(
   const floorY = wheelR + 0.6; // floor height above ground
   const bodyH = clamp(vehicle?.height_ft ?? spec.dimensions.heightFt, 7, 12) - floorY;
   const bodyColor = bodyColorFor(spec);
+  const accentColor = accentColorFor(spec);
 
   // --- shell -----------------------------------------------------------------
   // Opaque floor + roof, semi-transparent walls so the galley reads through.
   const body: Box[] = [
     { position: [0, floorY + WALL / 2, 0], size: [L, WALL, W], color: "#3f3f46" }, // floor
-    { position: [0, floorY + bodyH - WALL / 2, 0], size: [L, WALL, W], color: bodyColor, opacity: 0.55 }, // roof
+    { position: [0, floorY + bodyH - WALL / 2, 0], size: [L, WALL, W], color: accentColor, opacity: 0.55 }, // roof (accent)
     // street side (+z) and curb side (-z)
     { position: [0, floorY + bodyH / 2, W / 2 - WALL / 2], size: [L, bodyH, WALL], color: bodyColor, opacity: 0.32 },
     { position: [0, floorY + bodyH / 2, -(W / 2 - WALL / 2)], size: [L, bodyH, WALL], color: bodyColor, opacity: 0.32 },
@@ -208,16 +235,38 @@ export function buildTruckScene(
     { position: [wx, wheelR, -wheelZ], radius: wheelR, width: 0.7, color: "#18181b" },
   ]);
 
+  // --- decals (logos / graphics on the body) -----------------------------------
+  const outer = 0.02; // sit just outside the wall
+  const decals: SceneDecal[] = spec.exterior.decals.map((d) => {
+    const width = clamp(d.widthFt, 0.5, L - 1);
+    const height = width * (d.aspect || 1);
+    const y = clamp(d.heightFt, floorY + height / 2, floorY + bodyH - height / 2);
+    const x = clamp(L / 2 - d.xFt, -(L / 2) + width / 2, L / 2 - width / 2);
+    switch (d.side) {
+      case "curb":
+        return { url: d.url, position: [x, y, -(W / 2 + outer)], width, height, rotationY: Math.PI, label: d.label };
+      case "front":
+        return { url: d.url, position: [L / 2 + outer, y, 0], width, height, rotationY: Math.PI / 2, label: d.label };
+      case "rear":
+        return { url: d.url, position: [-(L / 2 + outer), y, 0], width, height, rotationY: -Math.PI / 2, label: d.label };
+      case "street":
+      default:
+        return { url: d.url, position: [x, y, W / 2 + outer], width, height, rotationY: 0, label: d.label };
+    }
+  });
+
   return {
     lengthFt: L,
     widthFt: W,
     heightFt: floorY + bodyH,
     bodyColor,
+    accentColor,
     isTrailer,
     body,
     cab,
     windows,
     equipment,
+    decals,
     wheels,
     floorY,
   };

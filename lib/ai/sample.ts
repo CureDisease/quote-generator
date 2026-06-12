@@ -120,7 +120,7 @@ const SPEC_TEMPLATES: Record<string, Partial<BuildSpec>> = {
     ],
     power: { generatorKw: 7, shorePower: true, batteries: false, solar: false, notes: "" },
     plumbing: { freshTankGal: 40, greyTankGal: 45, sinks: 2, waterHeater: true, notes: "" },
-    exterior: { paintColor: "", wrap: "Full vinyl wrap", servingWindows: [{ side: "curb", widthIn: 48 }] },
+    exterior: { paintColor: "", accentColor: "", wrap: "Full vinyl wrap", servingWindows: [{ side: "curb", widthIn: 48 }], decals: [] },
   },
   coffee_truck: {
     baseVehicle: "Compact van",
@@ -133,7 +133,7 @@ const SPEC_TEMPLATES: Record<string, Partial<BuildSpec>> = {
     ],
     power: { generatorKw: 5, shorePower: true, batteries: false, solar: false, notes: "" },
     plumbing: { freshTankGal: 30, greyTankGal: 32, sinks: 2, waterHeater: true, notes: "" },
-    exterior: { paintColor: "", wrap: "Vinyl wrap", servingWindows: [{ side: "curb", widthIn: 40 }] },
+    exterior: { paintColor: "", accentColor: "", wrap: "Vinyl wrap", servingWindows: [{ side: "curb", widthIn: 40 }], decals: [] },
   },
 };
 

@@ -27,6 +27,7 @@ import {
   updateSettings,
   updateVehicleModel,
   updateWorkshopMod,
+  uploadBrandAsset as uploadBrandAssetFile,
   uploadBuildDocument,
 } from "@/lib/data";
 import { providerFor } from "@/lib/ai";
@@ -300,6 +301,33 @@ export async function saveBuilderSpec(
   }
   revalidatePath(`/quotes/${quoteId}`);
   return { ok: true };
+}
+
+export async function uploadBrandAsset(
+  formData: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+  const quoteId = String(formData.get("quoteId") ?? "");
+  const file = formData.get("file");
+  if (!quoteId || !(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "No file." };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { ok: false, error: "Logo must be under 5MB." };
+  }
+  try {
+    const url = await uploadBrandAssetFile({
+      quote_id: quoteId,
+      filename: file.name || "logo.png",
+      mime_type: file.type,
+      bytes: Buffer.from(await file.arrayBuffer()),
+    });
+    return { ok: true, url };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Upload failed.",
+    };
+  }
 }
 
 export async function aiEditSpec(

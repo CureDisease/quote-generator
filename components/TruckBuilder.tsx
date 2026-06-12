@@ -3,8 +3,13 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { TruckPreview } from "@/components/TruckPreview";
-import { aiEditSpec, saveBuilderSpec } from "@/app/actions";
-import { equipmentColorFor } from "@/lib/truck/model";
+import { aiEditSpec, saveBuilderSpec, uploadBrandAsset } from "@/app/actions";
+import {
+  accentColorFor,
+  bodyColorFor,
+  equipmentColorFor,
+} from "@/lib/truck/model";
+import type { Decal } from "@/lib/types";
 import {
   EQUIPMENT_CATEGORIES,
   type BuildSpec,
@@ -165,6 +170,65 @@ export function TruckBuilder({
   function removeItem(id: string) {
     setItems((prev) => prev.filter((i) => i.uid !== id));
     setSelected(null);
+  }
+
+  // --- branding / wrap ---------------------------------------------------------
+  function patchExterior(patch: Partial<BuildSpec["exterior"]>) {
+    setSpec((s) => ({ ...s, exterior: { ...s.exterior, ...patch } }));
+  }
+  function updateDecal(id: string, patch: Partial<Decal>) {
+    setSpec((s) => ({
+      ...s,
+      exterior: {
+        ...s.exterior,
+        decals: s.exterior.decals.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+      },
+    }));
+  }
+  function removeDecal(id: string) {
+    setSpec((s) => ({
+      ...s,
+      exterior: { ...s.exterior, decals: s.exterior.decals.filter((d) => d.id !== id) },
+    }));
+  }
+  async function onLogo(file: File) {
+    setMsg(null);
+    // Read intrinsic aspect ratio client-side before upload.
+    const objUrl = URL.createObjectURL(file);
+    const aspect = await new Promise<number>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img.naturalHeight / img.naturalWidth || 1);
+      img.onerror = () => resolve(1);
+      img.src = objUrl;
+    });
+    URL.revokeObjectURL(objUrl);
+    const fd = new FormData();
+    fd.set("quoteId", quoteId);
+    fd.set("file", file);
+    const res = await uploadBrandAsset(fd);
+    if (res.ok && res.url) {
+      setSpec((s) => ({
+        ...s,
+        exterior: {
+          ...s.exterior,
+          decals: [
+            ...s.exterior.decals,
+            {
+              id: `d${Date.now()}`,
+              url: res.url!,
+              side: "street",
+              xFt: round1(L / 2),
+              heightFt: round1(W * 0.7 + 3),
+              widthFt: 3,
+              aspect,
+              label: file.name.replace(/\.[^.]+$/, ""),
+            },
+          ],
+        },
+      }));
+    } else {
+      setMsg({ kind: "err", text: res.error ?? "Logo upload failed." });
+    }
   }
 
   // --- pointer drag within the plan -------------------------------------------
@@ -363,6 +427,83 @@ export function TruckBuilder({
             </button>
           </div>
         </div>
+
+        {/* Branding & wrap */}
+        <div className="rounded-xl border border-white/10 bg-ink-soft/60 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-white">Wrap &amp; branding</h2>
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="text-xs text-zinc-400">
+              <span className="mb-1 block">Body color</span>
+              <input
+                type="color"
+                defaultValue={bodyColorFor(liveSpec)}
+                onChange={(e) => patchExterior({ paintColor: e.target.value })}
+                className="h-9 w-16 cursor-pointer rounded border border-white/12 bg-transparent"
+              />
+            </label>
+            <label className="text-xs text-zinc-400">
+              <span className="mb-1 block">Accent (roof)</span>
+              <input
+                type="color"
+                defaultValue={accentColorFor(liveSpec)}
+                onChange={(e) => patchExterior({ accentColor: e.target.value })}
+                className="h-9 w-16 cursor-pointer rounded border border-white/12 bg-transparent"
+              />
+            </label>
+            <label className="text-xs text-zinc-400">
+              <span className="mb-1 block">Add logo / graphic</span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) onLogo(f);
+                  e.target.value = "";
+                }}
+                className="block w-56 text-xs text-zinc-400 file:mr-2 file:rounded file:border-0 file:bg-amber-brand file:px-2 file:py-1 file:text-xs file:font-semibold file:text-black"
+              />
+            </label>
+          </div>
+
+          {spec.exterior.decals.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {spec.exterior.decals.map((d) => (
+                <div
+                  key={d.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-2 text-xs"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={d.url} alt={d.label} className="h-8 w-8 rounded object-contain" />
+                  <span className="w-24 truncate text-zinc-300">{d.label}</span>
+                  <select
+                    value={d.side}
+                    onChange={(e) => updateDecal(d.id, { side: e.target.value as Decal["side"] })}
+                    className="rounded border border-white/12 bg-white/[0.03] px-1.5 py-1 text-zinc-200"
+                  >
+                    <option value="street">street</option>
+                    <option value="curb">curb</option>
+                    <option value="rear">rear</option>
+                    <option value="front">front</option>
+                  </select>
+                  <NumIn label="x" value={d.xFt} onChange={(v) => updateDecal(d.id, { xFt: v })} />
+                  <NumIn label="h" value={d.heightFt} onChange={(v) => updateDecal(d.id, { heightFt: v })} />
+                  <NumIn label="w" value={d.widthFt} onChange={(v) => updateDecal(d.id, { widthFt: v })} />
+                  <button
+                    onClick={() => removeDecal(d.id)}
+                    className="ml-auto rounded border border-red-500/30 px-2 py-1 text-red-300 hover:bg-red-500/10"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-zinc-500">
+              Upload a logo to place it on the truck. Colors and graphics show on the
+              customer share link.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Sidebar: price, gallery, save */}
@@ -455,5 +596,28 @@ export function TruckBuilder({
         </div>
       </aside>
     </div>
+  );
+}
+
+function NumIn({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-1 text-zinc-500">
+      {label}
+      <input
+        type="number"
+        step="0.5"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="w-14 rounded border border-white/12 bg-white/[0.03] px-1.5 py-1 text-zinc-200"
+      />
+    </label>
   );
 }
