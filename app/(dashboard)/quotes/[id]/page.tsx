@@ -4,6 +4,7 @@ import { getQuote, getQuoteShare, getVehicleModel } from "@/lib/data";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { QuoteDocument } from "@/components/QuoteDocument";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TruckElevation } from "@/components/TruckElevation";
 import { TruckPreview } from "@/components/TruckPreview";
 import {
   deleteQuoteAction,
@@ -68,6 +69,9 @@ export default async function QuoteDetailPage({
             vehicle={vehicle}
             className="h-96 w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]"
           />
+          <div className="mt-3 rounded-xl border border-white/10 bg-white p-3">
+            <TruckElevation spec={spec} vehicle={vehicle} />
+          </div>
         </div>
       ) : null}
 

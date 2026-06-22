@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { QuoteDocument } from "@/components/QuoteDocument";
+import { TruckElevation } from "@/components/TruckElevation";
 import { TruckPreview } from "@/components/TruckPreview";
 import { getSharedQuote } from "@/lib/data";
 import { isBlankSpec, normalizeBuildSpec } from "@/lib/spec";
@@ -52,6 +53,9 @@ export default async function SharedQuotePage({
             spec={spec}
             className="h-[420px] w-full overflow-hidden rounded-xl border border-white/10 bg-[#101013]"
           />
+          <div className="mt-3 rounded-xl border border-white/10 bg-white p-3">
+            <TruckElevation spec={spec} />
+          </div>
           {spec.summary ? (
             <p className="mt-3 text-sm leading-relaxed text-zinc-400">
               {spec.summary}

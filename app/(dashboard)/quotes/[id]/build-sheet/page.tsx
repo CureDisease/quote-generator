@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TruckElevation } from "@/components/TruckElevation";
 import { getQuote, getVehicleModel } from "@/lib/data";
 import { normalizeBuildSpec } from "@/lib/spec";
 import {
@@ -84,6 +85,25 @@ export default async function BuildSheetPage({
           curb side bottom.
         </p>
         <FloorPlan plan={plan} L={L} W={W} scene={scene} />
+
+        {/* Side elevations */}
+        <h2 className="mt-6 text-sm font-bold uppercase tracking-wide text-zinc-700">
+          Side elevations
+        </h2>
+        <div className="mt-2 space-y-3">
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Street side
+            </div>
+            <TruckElevation spec={spec} vehicle={vehicle} side="street" className="w-full" />
+          </div>
+          <div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+              Curb side (serving)
+            </div>
+            <TruckElevation spec={spec} vehicle={vehicle} side="curb" className="w-full" />
+          </div>
+        </div>
 
         {/* Equipment schedule */}
         <h2 className="mt-6 text-sm font-bold uppercase tracking-wide text-zinc-700">
