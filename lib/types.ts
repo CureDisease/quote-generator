@@ -49,6 +49,8 @@ export interface Quote {
   quote_data: QuoteData;
   build_spec: BuildSpec;
   vehicle_model_id: string | null;
+  sales_notes: string;
+  follow_up_at: string | null; // ISO timestamp for the next follow-up
   revisions: QuoteRevision[];
   ai_provider: string;
   ai_model: string;

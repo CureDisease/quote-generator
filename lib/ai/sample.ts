@@ -209,6 +209,11 @@ export const sampleProvider: QuoteAiProvider = {
     };
   },
 
+  async transcribe(doc): Promise<string> {
+    // No AI connected — text-based files are parsed upstream; media can't be read.
+    return doc.text || "";
+  },
+
   async extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult> {
     const items = sampleCatalogFromKnowledge(ctx);
     return {

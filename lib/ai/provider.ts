@@ -109,6 +109,9 @@ export interface QuoteAiProvider {
   // Read the knowledge base (pricing sheets, prior quotes) and extract
   // distinct equipment items for the builder's gallery catalog.
   extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult>;
+  // Turn a media document (PDF / image) into plain text for the knowledge
+  // base. Returns "" when the provider can't read media.
+  transcribe(doc: ExtractDoc, settings: AiSettings): Promise<string>;
 }
 
 // Builds the reference-context block from active knowledge documents.

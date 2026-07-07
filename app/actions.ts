@@ -380,6 +380,32 @@ export async function setQuoteStatusAction(formData: FormData) {
   revalidatePath("/");
 }
 
+// Callable (non-form) status change used by the pipeline board's drag & drop.
+export async function setQuoteStatus(
+  id: string,
+  status: QuoteStatus,
+): Promise<{ ok: boolean }> {
+  if (!id) return { ok: false };
+  await updateQuote(id, { status });
+  revalidatePath("/");
+  revalidatePath(`/quotes/${id}`);
+  return { ok: true };
+}
+
+// Sales notes + follow-up reminder from the quote page's sales panel.
+export async function saveSalesInfoAction(formData: FormData) {
+  const id = String(formData.get("quoteId") ?? "");
+  const sales_notes = String(formData.get("sales_notes") ?? "");
+  const followUp = String(formData.get("follow_up_at") ?? "").trim();
+  await updateQuote(id, {
+    sales_notes,
+    follow_up_at: followUp ? new Date(followUp).toISOString() : null,
+  });
+  revalidatePath(`/quotes/${id}`);
+  revalidatePath("/");
+  redirect(`/quotes/${id}`);
+}
+
 export async function deleteQuoteAction(formData: FormData) {
   const id = String(formData.get("quoteId") ?? "");
   await deleteQuote(id);
@@ -401,6 +427,73 @@ export async function addKnowledgeAction(formData: FormData) {
   await addKnowledge({ title: title || "Untitled", doc_type, content, tags });
   revalidatePath("/knowledge");
   redirect("/knowledge");
+}
+
+// Upload files (PDF, docx, eml/msg, images, text) as training material. Text
+// formats are parsed locally; PDFs/images are transcribed by the connected AI.
+export async function addKnowledgeFilesAction(formData: FormData) {
+  const files = formData
+    .getAll("documents")
+    .filter((f): f is File => f instanceof File && f.size > 0)
+    .slice(0, MAX_FILES);
+  if (!files.length) redirect("/knowledge");
+
+  const settings = await getSettings();
+  const provider = providerFor(settings);
+  let added = 0;
+  const warnings: string[] = [];
+
+  for (const file of files) {
+    if (file.size > MAX_FILE_BYTES) {
+      warnings.push(`${file.name}: larger than 10MB, skipped`);
+      continue;
+    }
+    const doc = await parseUploadedFile(file);
+    if (doc.warning) {
+      warnings.push(doc.warning);
+      if (!doc.text && !doc.media) continue;
+    }
+    let content = doc.text;
+    if (!content && doc.media) {
+      try {
+        content = await provider.transcribe(
+          { filename: doc.filename, text: doc.text, media: doc.media },
+          settings,
+        );
+      } catch (err) {
+        warnings.push(
+          `${file.name}: ${err instanceof Error ? err.message : "transcription failed"}`,
+        );
+        continue;
+      }
+      if (!content) {
+        warnings.push(
+          `${file.name}: PDFs/images need the AI provider connected to be read — skipped`,
+        );
+        continue;
+      }
+    }
+    if (!content.trim()) {
+      warnings.push(`${file.name}: no readable text found`);
+      continue;
+    }
+
+    const name = file.name.replace(/\.[^.]+$/, "");
+    const doc_type: DocType = /\.(eml|msg)$/i.test(file.name)
+      ? "email"
+      : /pric/i.test(file.name)
+        ? "pricing"
+        : /quote|estimate/i.test(file.name)
+          ? "quote"
+          : "documentation";
+    await addKnowledge({ title: name || file.name, doc_type, content: content.trim() });
+    added++;
+  }
+
+  revalidatePath("/knowledge");
+  const params = new URLSearchParams({ added: String(added) });
+  if (warnings.length) params.set("warn", warnings.join(" · "));
+  redirect(`/knowledge?${params.toString()}`);
 }
 
 export async function toggleKnowledgeAction(formData: FormData) {

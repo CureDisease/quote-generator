@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { CatalogManager } from "@/components/CatalogManager";
 import {
   addKnowledgeAction,
+  addKnowledgeFilesAction,
   deleteKnowledgeAction,
   toggleKnowledgeAction,
   updateSettingsAction,
@@ -16,7 +17,14 @@ export const dynamic = "force-dynamic";
 export default async function KnowledgePage({
   searchParams,
 }: {
-  searchParams: { saved?: string; catalog?: string; note?: string; error?: string };
+  searchParams: {
+    saved?: string;
+    catalog?: string;
+    note?: string;
+    error?: string;
+    added?: string;
+    warn?: string;
+  };
 }) {
   const [settings, docs, catalog] = await Promise.all([
     getSettings(),
@@ -52,6 +60,16 @@ export default async function KnowledgePage({
       {searchParams.saved ? (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
           Behavior settings saved.
+        </div>
+      ) : null}
+
+      {searchParams.added != null ? (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          Added {searchParams.added} document{searchParams.added === "1" ? "" : "s"} to the
+          knowledge base.
+          {searchParams.warn ? (
+            <span className="mt-1 block text-xs text-amber-200/90">⚠ {searchParams.warn}</span>
+          ) : null}
         </div>
       ) : null}
 
@@ -137,14 +155,40 @@ export default async function KnowledgePage({
           <div>
             <h2 className="text-lg font-semibold">Upload training material</h2>
             <p className="mt-1 text-sm text-zinc-400">
-              Paste a prior quote, an email thread, a pricing sheet, or any documentation.
+              Drop in prior quotes, pricing sheets, emails, and docs — the same files you
+              already have. Text is extracted automatically.
             </p>
           </div>
 
+          {/* File upload — the fast path */}
           <form
-            action={addKnowledgeAction}
-            className="space-y-4 rounded-xl border border-white/10 bg-ink-soft/60 p-5"
+            action={addKnowledgeFilesAction}
+            className="space-y-3 rounded-xl border border-white/10 bg-ink-soft/60 p-5"
           >
+            <input
+              type="file"
+              name="documents"
+              multiple
+              required
+              accept=".pdf,.docx,.eml,.msg,.txt,.md,.csv,image/*,application/pdf"
+              className="block w-full cursor-pointer rounded-lg border border-dashed border-white/20 bg-white/[0.02] px-3 py-6 text-sm text-zinc-300 file:mr-4 file:rounded-md file:border-0 file:bg-amber-brand file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-black hover:border-amber-brand/50"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-zinc-500">
+                PDF, Word (.docx), email (.eml/.msg), text, and images. Up to 10 files, 10MB
+                each. Titles &amp; types are guessed from filenames — editable below after
+                upload. PDFs/images are read by the connected AI.
+              </p>
+              <SubmitButton pendingLabel="Reading files…">Upload</SubmitButton>
+            </div>
+          </form>
+
+          {/* Manual paste — collapsed */}
+          <details className="rounded-xl border border-white/10 bg-ink-soft/60">
+            <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-zinc-300 hover:text-white">
+              Or paste text manually…
+            </summary>
+            <form action={addKnowledgeAction} className="space-y-4 p-5 pt-1">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Title">
                 <input
@@ -181,7 +225,8 @@ export default async function KnowledgePage({
             <div className="flex justify-end">
               <SubmitButton pendingLabel="Saving…">Add to knowledge base</SubmitButton>
             </div>
-          </form>
+            </form>
+          </details>
         </section>
       </div>
 

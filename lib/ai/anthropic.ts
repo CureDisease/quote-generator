@@ -300,6 +300,37 @@ function parseCatalog(text: string): ExtractedCatalogItem[] {
 export const anthropicProvider: QuoteAiProvider = {
   name: "anthropic",
 
+  async transcribe(doc, settings): Promise<string> {
+    if (doc.text) return doc.text;
+    if (!doc.media) return "";
+    const client = createClient({ settings });
+    const model = settings.model?.trim() || DEFAULT_MODEL;
+    const block: Anthropic.ContentBlockParam =
+      doc.media.kind === "pdf"
+        ? {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: doc.media.base64 },
+          }
+        : {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: doc.media.mediaType as
+                | "image/png"
+                | "image/jpeg"
+                | "image/gif"
+                | "image/webp",
+              data: doc.media.base64,
+            },
+          };
+    return complete(
+      client,
+      model,
+      "Transcribe the attached document into clean plain text. Preserve prices, item names, and quantities exactly. Render tables as aligned text. Return ONLY the transcription.",
+      [{ type: "text", text: `Document: ${doc.filename}` }, block],
+    );
+  },
+
   async extractCatalog(ctx: CatalogExtractContext): Promise<CatalogResult> {
     const client = createClient(ctx);
     const model = ctx.settings.model?.trim() || DEFAULT_MODEL;

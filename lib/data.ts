@@ -141,6 +141,8 @@ export async function updateQuote(
     ai_provider?: string;
     ai_model?: string;
     revisions?: Quote["revisions"];
+    sales_notes?: string;
+    follow_up_at?: string | null;
   },
 ): Promise<void> {
   const sb = getSupabase();

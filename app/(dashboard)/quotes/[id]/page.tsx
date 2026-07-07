@@ -9,6 +9,7 @@ import { TruckPreview } from "@/components/TruckPreview";
 import {
   deleteQuoteAction,
   refineQuoteAction,
+  saveSalesInfoAction,
   setQuoteShareAction,
   setQuoteStatusAction,
 } from "@/app/actions";
@@ -103,6 +104,35 @@ export default async function QuoteDetailPage({
                 className="w-full rounded-md bg-amber-brand px-4 py-2 text-sm font-semibold text-black transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Apply change
+              </SubmitButton>
+            </form>
+          </Panel>
+
+          {/* Sales notes & follow-up */}
+          <Panel title="Sales notes & follow-up">
+            <form action={saveSalesInfoAction} className="space-y-3">
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <textarea
+                name="sales_notes"
+                rows={3}
+                defaultValue={quote.sales_notes ?? ""}
+                placeholder="Call summary, objections, next steps…"
+                className="w-full rounded-lg border border-white/12 bg-white/[0.03] px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-500 focus:border-amber-brand"
+              />
+              <label className="block text-xs text-zinc-400">
+                Follow up on
+                <input
+                  type="date"
+                  name="follow_up_at"
+                  defaultValue={quote.follow_up_at ? quote.follow_up_at.slice(0, 10) : ""}
+                  className="mt-1 w-full rounded-md border border-white/12 bg-white/[0.03] px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-brand"
+                />
+              </label>
+              <SubmitButton
+                pendingLabel="Saving…"
+                className="w-full rounded-md bg-white/10 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-white/15"
+              >
+                Save sales info
               </SubmitButton>
             </form>
           </Panel>
