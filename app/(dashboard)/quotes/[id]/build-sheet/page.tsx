@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
 import { TruckElevation } from "@/components/TruckElevation";
-import { getQuote, getVehicleModel } from "@/lib/data";
+import { getQuote, getQuoteShare, getVehicleModel, listCatalog } from "@/lib/data";
 import { normalizeBuildSpec } from "@/lib/spec";
 import {
   buildTruckScene,
@@ -23,9 +25,11 @@ export default async function BuildSheetPage({
 }) {
   const quote = await getQuote(params.id);
   if (!quote) notFound();
-  const vehicle = quote.vehicle_model_id
-    ? await getVehicleModel(quote.vehicle_model_id)
-    : null;
+  const [vehicle, share, catalog] = await Promise.all([
+    quote.vehicle_model_id ? getVehicleModel(quote.vehicle_model_id) : Promise.resolve(null),
+    getQuoteShare(params.id),
+    listCatalog(),
+  ]);
   const spec = normalizeBuildSpec(quote.build_spec, quote.truck_type);
   const scene = buildTruckScene(spec, vehicle);
   const plan = planFromScene(scene).sort((a, b) => a.xFromFrontFt - b.xFromFrontFt);
@@ -37,6 +41,29 @@ export default async function BuildSheetPage({
     month: "short",
     day: "numeric",
   });
+
+  // QR: shop-floor link to the live 3D (customer page when shared, else the quote).
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const liveUrl = share?.share_enabled
+    ? `${proto}://${host}/q/${share.share_token}`
+    : `${proto}://${host}/quotes/${quote.id}`;
+  const qrSvg = await QRCode.toString(liveUrl, {
+    type: "svg",
+    margin: 1,
+    width: 96,
+    color: { dark: "#111827", light: "#ffffff" },
+  });
+
+  // Weights from the catalog (0 = unknown) for the payload check.
+  const weightFor = (name: string) =>
+    catalog.find((c) => c.name.toLowerCase() === name.toLowerCase())?.weight_lbs ?? 0;
+  const totalWeight = plan.reduce((s, p) => s + weightFor(p.name), 0);
+  const payloadCap =
+    vehicle && vehicle.gvwr_lbs > 0 && (vehicle.curb_weight_lbs ?? 0) > 0
+      ? vehicle.gvwr_lbs - vehicle.curb_weight_lbs
+      : 0;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -59,12 +86,19 @@ export default async function BuildSheetPage({
             </div>
             <p className="mt-1 text-xs text-zinc-500">Shop Build Sheet — install reference</p>
           </div>
-          <div className="text-right text-xs text-zinc-600">
-            <div className="text-base font-bold uppercase tracking-wide text-zinc-800">
-              Build Sheet
+          <div className="flex items-start gap-3">
+            <div className="text-right text-xs text-zinc-600">
+              <div className="text-base font-bold uppercase tracking-wide text-zinc-800">
+                Build Sheet
+              </div>
+              <div>#{quote.id.slice(0, 8).toUpperCase()}</div>
+              <div>Rev {rev} · {date}</div>
+              <div className="mt-1 text-[10px] text-zinc-400">scan for live 3D ↴</div>
             </div>
-            <div>#{quote.id.slice(0, 8).toUpperCase()}</div>
-            <div>Rev {rev} · {date}</div>
+            <div
+              className="h-24 w-24 shrink-0"
+              dangerouslySetInnerHTML={{ __html: qrSvg }}
+            />
           </div>
         </div>
 
@@ -117,6 +151,7 @@ export default async function BuildSheetPage({
               <th className="py-1.5 font-semibold">Side</th>
               <th className="py-1.5 text-right font-semibold">From front (center)</th>
               <th className="py-1.5 text-right font-semibold">Footprint</th>
+              <th className="py-1.5 text-right font-semibold">Weight</th>
             </tr>
           </thead>
           <tbody>
@@ -129,17 +164,44 @@ export default async function BuildSheetPage({
                 <td className="py-1.5 text-right text-zinc-600">
                   {ftIn(p.lengthFt)} × {ftIn(p.depthFt)}
                 </td>
+                <td className="py-1.5 text-right text-zinc-600">
+                  {weightFor(p.name) ? `${Math.round(weightFor(p.name)).toLocaleString()} lb` : "—"}
+                </td>
               </tr>
             ))}
+            {plan.length > 0 ? (
+              <tr>
+                <td colSpan={5} className="py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Total equipment weight
+                </td>
+                <td className="py-1.5 text-right font-semibold text-zinc-800">
+                  {Math.round(totalWeight).toLocaleString()} lb
+                </td>
+              </tr>
+            ) : null}
             {plan.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-3 text-center text-zinc-400">
+                <td colSpan={6} className="py-3 text-center text-zinc-400">
                   No equipment placed yet — lay it out in the builder.
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
+
+        {payloadCap > 0 ? (
+          <p
+            className={`mt-2 rounded-lg px-3 py-2 text-xs ${
+              totalWeight > payloadCap
+                ? "bg-red-50 font-semibold text-red-700"
+                : "bg-zinc-50 text-zinc-600"
+            }`}
+          >
+            {totalWeight > payloadCap
+              ? `⚠ OVER PAYLOAD: equipment ${Math.round(totalWeight).toLocaleString()} lb exceeds the ${payloadCap.toLocaleString()} lb payload capacity (GVWR ${vehicle!.gvwr_lbs.toLocaleString()} − curb ${vehicle!.curb_weight_lbs.toLocaleString()}) before water, propane, product, and crew.`
+              : `Payload check: ${Math.round(totalWeight).toLocaleString()} lb of ${payloadCap.toLocaleString()} lb capacity (GVWR ${vehicle!.gvwr_lbs.toLocaleString()} − curb ${vehicle!.curb_weight_lbs.toLocaleString()}). Remember water, propane, product, and crew.`}
+          </p>
+        ) : null}
 
         {/* Cut openings */}
         <h2 className="mt-6 text-sm font-bold uppercase tracking-wide text-zinc-700">

@@ -151,7 +151,7 @@ function VehicleRow({ v }: { v: VehicleModel }) {
     <div className="rounded-xl border border-white/10 bg-ink-soft/60 p-3">
       <form
         action={updateVehicleAction}
-        className="grid items-end gap-2 sm:grid-cols-[1.8fr_repeat(6,0.8fr)_auto]"
+        className="grid items-end gap-2 sm:grid-cols-[1.8fr_repeat(7,0.8fr)_auto]"
       >
         <input type="hidden" name="id" value={v.id} />
         <Mini label="Label">
@@ -174,6 +174,9 @@ function VehicleRow({ v }: { v: VehicleModel }) {
         </Mini>
         <Mini label="GVWR lb">
           <input name="gvwr_lbs" type="number" step="100" defaultValue={v.gvwr_lbs} className="vinput" />
+        </Mini>
+        <Mini label="Curb lb">
+          <input name="curb_weight_lbs" type="number" step="100" defaultValue={v.curb_weight_lbs ?? 0} className="vinput" />
         </Mini>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 text-[11px] text-zinc-400">

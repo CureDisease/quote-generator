@@ -20,6 +20,16 @@ export const dynamic = "force-dynamic";
 
 const STATUSES: QuoteStatus[] = ["draft", "revised", "sent", "accepted", "archived"];
 
+const ACTIVITY_ICONS: Record<string, string> = {
+  created: "✨",
+  spec_updated: "📐",
+  generated: "🧾",
+  refined: "✏️",
+  status: "🔁",
+  share: "🔗",
+  sales: "📞",
+};
+
 export default async function QuoteDetailPage({
   params,
   searchParams,
@@ -250,6 +260,28 @@ export default async function QuoteDetailPage({
                       <div className="text-zinc-500">
                         {new Date(r.at).toLocaleString()}
                       </div>
+                    </li>
+                  ))}
+              </ul>
+            </Panel>
+          ) : null}
+
+          {/* Activity timeline */}
+          {quote.activity?.length ? (
+            <Panel title="Activity">
+              <ul className="max-h-64 space-y-2 overflow-y-auto pr-1 text-xs">
+                {quote.activity
+                  .slice()
+                  .reverse()
+                  .map((a, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5">{ACTIVITY_ICONS[a.kind] ?? "•"}</span>
+                      <span className="min-w-0">
+                        <span className="block text-zinc-300">{a.detail}</span>
+                        <span className="text-zinc-600">
+                          {new Date(a.at).toLocaleString()}
+                        </span>
+                      </span>
                     </li>
                   ))}
               </ul>

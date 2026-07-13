@@ -152,6 +152,25 @@ export async function updateQuote(
   await sb.from("quotes").update(out).eq("id", id);
 }
 
+/** Append an entry to a quote's activity timeline (best-effort, non-fatal). */
+export async function logActivity(
+  quoteId: string,
+  kind: Quote["activity"][number]["kind"],
+  detail: string,
+): Promise<void> {
+  const sb = getSupabase();
+  const { data } = await sb
+    .from("quotes")
+    .select("activity")
+    .eq("id", quoteId)
+    .maybeSingle();
+  const activity = [
+    ...(((data as { activity?: Quote["activity"] }) ?? {}).activity ?? []),
+    { at: new Date().toISOString(), kind, detail },
+  ].slice(-100); // keep the last 100 entries
+  await sb.from("quotes").update({ activity }).eq("id", quoteId);
+}
+
 // ----- Share links -----------------------------------------------------------
 
 export interface SharedQuote {
@@ -227,6 +246,7 @@ export async function addCatalogItem(
     height_ft: item.height_ft,
     unit_price: item.unit_price,
     power_watts: item.power_watts,
+    weight_lbs: item.weight_lbs ?? 0,
     tags: item.tags,
     notes: item.notes,
     source: item.source ?? "manual",
@@ -255,6 +275,7 @@ export async function mergeCatalogItems(
       height_ft: i.height_ft,
       unit_price: i.unit_price,
       power_watts: i.power_watts,
+      weight_lbs: i.weight_lbs ?? 0,
       tags: i.tags,
       notes: i.notes,
       source: "extracted" as const,
@@ -276,6 +297,7 @@ export async function updateCatalogItem(
       | "height_ft"
       | "unit_price"
       | "power_watts"
+      | "weight_lbs"
       | "tags"
       | "notes"
       | "active"

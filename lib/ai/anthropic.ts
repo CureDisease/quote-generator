@@ -239,6 +239,7 @@ Return ONLY a single JSON object (no prose, no markdown fences) with this shape:
     "height_ft": number,
     "unit_price": number,       // USD, from the company's own pricing where present
     "power_watts": number,      // electrical draw, 0 for gas/none
+    "weight_lbs": number,       // typical installed weight, 0 if unknown
     "tags": [string],
     "notes": string
   }
@@ -288,6 +289,7 @@ function parseCatalog(text: string): ExtractedCatalogItem[] {
         height_ft: num(o.height_ft, 3),
         unit_price: num(o.unit_price, 0),
         power_watts: num(o.power_watts, 0),
+        weight_lbs: num(o.weight_lbs, 0),
         tags: Array.isArray(o.tags)
           ? o.tags.map((t) => String(t).trim()).filter(Boolean)
           : [],

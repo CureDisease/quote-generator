@@ -54,7 +54,7 @@ export function CatalogManager({
       {/* Add a new item */}
       <form
         action={addCatalogItemAction}
-        className="grid items-end gap-3 rounded-xl border border-white/10 bg-ink-soft/60 p-4 sm:grid-cols-[1.6fr_1fr_repeat(4,0.7fr)_auto]"
+        className="grid items-end gap-3 rounded-xl border border-white/10 bg-ink-soft/60 p-4 sm:grid-cols-[1.6fr_1fr_repeat(5,0.7fr)_auto]"
       >
         <Mini label="Name">
           <input name="name" required placeholder="Flat-top griddle" className="cinput" />
@@ -80,6 +80,9 @@ export function CatalogManager({
         <Mini label="Price $">
           <input name="unit_price" type="number" step="1" defaultValue={0} className="cinput" />
         </Mini>
+        <Mini label="Wt lb">
+          <input name="weight_lbs" type="number" step="5" defaultValue={0} className="cinput" />
+        </Mini>
         <SubmitButton pendingLabel="…">Add</SubmitButton>
       </form>
 
@@ -100,6 +103,7 @@ export function CatalogManager({
                 <th className="p-2 text-right font-semibold">H</th>
                 <th className="p-2 text-right font-semibold">Price</th>
                 <th className="p-2 text-right font-semibold">Watts</th>
+                <th className="p-2 text-right font-semibold">Wt lb</th>
                 <th className="p-2"></th>
               </tr>
             </thead>
@@ -145,6 +149,9 @@ export function CatalogManager({
                   </td>
                   <td className="p-1.5">
                     <input form={`cat-${it.id}`} name="power_watts" type="number" step="10" defaultValue={it.power_watts} className="cinput w-20 text-right" />
+                  </td>
+                  <td className="p-1.5">
+                    <input form={`cat-${it.id}`} name="weight_lbs" type="number" step="5" defaultValue={it.weight_lbs ?? 0} className="cinput w-20 text-right" />
                   </td>
                   <td className="whitespace-nowrap p-1.5 text-right">
                     <input type="hidden" form={`cat-${it.id}`} name="tags" defaultValue={it.tags.join(", ")} />

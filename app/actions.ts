@@ -18,6 +18,7 @@ import {
   getVehicleModel,
   insertQuote,
   listCatalog,
+  logActivity,
   mergeCatalogItems,
   setKnowledgeActive,
   setQuoteShareEnabled,
@@ -161,6 +162,7 @@ export async function intakeQuoteAction(formData: FormData) {
     redirect(`/quotes/new?error=${encodeURIComponent(msg)}`);
   }
 
+  await logActivity(id!, "created", "Quote created from customer intake");
   revalidatePath("/");
   redirect(`/quotes/${id!}/spec`);
 }
@@ -200,6 +202,7 @@ export async function generateQuoteAction(formData: FormData) {
     ai_provider: result.provider,
     ai_model: result.model,
   });
+  await logActivity(id, "generated", `Quote generated (${result.provider})`);
 
   revalidatePath("/");
   revalidatePath(`/quotes/${id}`);
@@ -248,6 +251,7 @@ export async function refineQuoteAction(formData: FormData) {
     ai_model: result.model,
     revisions,
   });
+  await logActivity(id, "refined", `Refined: ${instruction.slice(0, 120)}`);
 
   revalidatePath(`/quotes/${id}`);
   redirect(`/quotes/${id}`);
@@ -272,6 +276,7 @@ export async function saveBuilderSpec(
 
   if (!reprice) {
     await updateQuote(quoteId, { build_spec: spec });
+    await logActivity(quoteId, "spec_updated", "Layout saved in the builder");
     revalidatePath(`/quotes/${quoteId}`);
     return { ok: true };
   }
@@ -292,6 +297,7 @@ export async function saveBuilderSpec(
       ai_provider: result.provider,
       ai_model: result.model,
     });
+    await logActivity(quoteId, "generated", "Layout saved & quote re-priced from the builder");
   } catch (err) {
     await updateQuote(quoteId, { build_spec: spec });
     return {
@@ -369,6 +375,7 @@ export async function setQuoteShareAction(formData: FormData) {
   const id = String(formData.get("quoteId") ?? "");
   const enabled = String(formData.get("enabled") ?? "false") === "true";
   await setQuoteShareEnabled(id, enabled);
+  await logActivity(id, "share", enabled ? "Customer link enabled" : "Customer link disabled");
   revalidatePath(`/quotes/${id}`);
 }
 
@@ -376,6 +383,7 @@ export async function setQuoteStatusAction(formData: FormData) {
   const id = String(formData.get("quoteId") ?? "");
   const status = String(formData.get("status") ?? "draft") as QuoteStatus;
   await updateQuote(id, { status });
+  await logActivity(id, "status", `Status set to ${status}`);
   revalidatePath(`/quotes/${id}`);
   revalidatePath("/");
 }
@@ -387,6 +395,7 @@ export async function setQuoteStatus(
 ): Promise<{ ok: boolean }> {
   if (!id) return { ok: false };
   await updateQuote(id, { status });
+  await logActivity(id, "status", `Status set to ${status}`);
   revalidatePath("/");
   revalidatePath(`/quotes/${id}`);
   return { ok: true };
@@ -401,6 +410,7 @@ export async function saveSalesInfoAction(formData: FormData) {
     sales_notes,
     follow_up_at: followUp ? new Date(followUp).toISOString() : null,
   });
+  await logActivity(id, "sales", followUp ? `Sales info saved · follow-up ${followUp}` : "Sales info saved");
   revalidatePath(`/quotes/${id}`);
   revalidatePath("/");
   redirect(`/quotes/${id}`);
@@ -550,6 +560,7 @@ export async function addCatalogItemAction(formData: FormData) {
     height_ft: Number(formData.get("height_ft") ?? 3) || 3,
     unit_price: Number(formData.get("unit_price") ?? 0) || 0,
     power_watts: Number(formData.get("power_watts") ?? 0) || 0,
+    weight_lbs: Number(formData.get("weight_lbs") ?? 0) || 0,
     tags: String(formData.get("tags") ?? "")
       .split(",")
       .map((t) => t.trim())
@@ -571,6 +582,7 @@ export async function updateCatalogItemAction(formData: FormData) {
     height_ft: Number(formData.get("height_ft") ?? 3) || 3,
     unit_price: Number(formData.get("unit_price") ?? 0) || 0,
     power_watts: Number(formData.get("power_watts") ?? 0) || 0,
+    weight_lbs: Number(formData.get("weight_lbs") ?? 0) || 0,
     tags: String(formData.get("tags") ?? "")
       .split(",")
       .map((t) => t.trim())
@@ -610,6 +622,7 @@ function vehicleFromForm(formData: FormData) {
     wheelbase_ft: Number(formData.get("wheelbase_ft") ?? 12) || 0,
     axle_positions: parseNums(String(formData.get("axle_positions") ?? "")),
     gvwr_lbs: Number(formData.get("gvwr_lbs") ?? 0) || 0,
+    curb_weight_lbs: Number(formData.get("curb_weight_lbs") ?? 0) || 0,
     cut_zones: [] as CutZone[],
     notes: String(formData.get("notes") ?? "").trim(),
   };

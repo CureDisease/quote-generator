@@ -36,6 +36,13 @@ export interface QuoteRevision {
   summary: string;
 }
 
+// One entry in a quote's activity timeline.
+export interface QuoteActivity {
+  at: string; // ISO timestamp
+  kind: "created" | "spec_updated" | "generated" | "refined" | "status" | "share" | "sales";
+  detail: string;
+}
+
 export interface Quote {
   id: string;
   created_at: string;
@@ -51,6 +58,7 @@ export interface Quote {
   vehicle_model_id: string | null;
   sales_notes: string;
   follow_up_at: string | null; // ISO timestamp for the next follow-up
+  activity: QuoteActivity[];
   revisions: QuoteRevision[];
   ai_provider: string;
   ai_model: string;
@@ -175,6 +183,7 @@ export interface CatalogItem {
   height_ft: number;
   unit_price: number;
   power_watts: number; // 0 = no electrical load
+  weight_lbs: number; // installed weight, 0 = unknown
   tags: string[];
   notes: string;
   source: "manual" | "extracted";
@@ -206,6 +215,7 @@ export interface VehicleModel {
   wheelbase_ft: number;
   axle_positions: number[]; // ft from front of body to each axle center
   gvwr_lbs: number;
+  curb_weight_lbs: number; // empty vehicle weight; payload = GVWR - curb
   cut_zones: CutZone[];
   notes: string;
   active: boolean;

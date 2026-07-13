@@ -28,6 +28,7 @@ interface PlacedItem {
   xFt: number; // center distance from front wall
   side: "street" | "curb";
   price: number;
+  weight: number;
 }
 
 const WALL = 0.25;
@@ -37,6 +38,11 @@ const uid = () => `i${Date.now()}_${counter++}`;
 function priceFor(name: string, catalog: CatalogItem[]): number {
   const hit = catalog.find((c) => c.name.toLowerCase() === name.toLowerCase());
   return hit?.unit_price ?? 0;
+}
+
+function weightFor(name: string, catalog: CatalogItem[]): number {
+  const hit = catalog.find((c) => c.name.toLowerCase() === name.toLowerCase());
+  return hit?.weight_lbs ?? 0;
 }
 
 // Lay the spec's equipment into placed items, auto-packing anything without
@@ -73,6 +79,7 @@ function initItems(spec: BuildSpec, catalog: CatalogItem[]): PlacedItem[] {
       xFt,
       side,
       price: priceFor(e.name, catalog),
+      weight: weightFor(e.name, catalog),
     };
   });
 }
@@ -162,6 +169,7 @@ export function TruckBuilder({
         xFt: at?.xFt ?? Math.min(2, L - 1),
         side: at?.side ?? "street",
         price: c.unit_price,
+        weight: c.weight_lbs ?? 0,
       },
     ]);
     setMsg(null);
@@ -540,6 +548,54 @@ export function TruckBuilder({
             </button>
           </div>
         </div>
+
+        {/* Payload / axle-load check */}
+        {(() => {
+          const equipWeight = items.reduce((s, i) => s + i.weight, 0);
+          const payloadCap =
+            vehicle && vehicle.gvwr_lbs > 0 && vehicle.curb_weight_lbs > 0
+              ? vehicle.gvwr_lbs - vehicle.curb_weight_lbs
+              : 0;
+          const pct = payloadCap > 0 ? (equipWeight / payloadCap) * 100 : 0;
+          const over = payloadCap > 0 && equipWeight > payloadCap;
+          const warn = payloadCap > 0 && !over && pct > 85;
+          return (
+            <div className="rounded-xl border border-white/10 bg-ink-soft/60 p-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-semibold text-white">Equipment weight</span>
+                <span
+                  className={`text-lg font-bold ${
+                    over ? "text-red-300" : warn ? "text-amber-300" : "text-zinc-200"
+                  }`}
+                >
+                  {Math.round(equipWeight).toLocaleString()} lb
+                </span>
+              </div>
+              {payloadCap > 0 ? (
+                <>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className={`h-full transition-all ${
+                        over ? "bg-red-500" : warn ? "bg-amber-500" : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                  </div>
+                  <p className={`mt-1.5 text-xs ${over ? "text-red-300" : "text-zinc-500"}`}>
+                    {over
+                      ? `⚠ Over payload by ${Math.round(equipWeight - payloadCap).toLocaleString()} lb (capacity ${payloadCap.toLocaleString()} lb) — before water, propane, product, and crew.`
+                      : `${Math.round(pct)}% of ${payloadCap.toLocaleString()} lb payload (GVWR − curb). Leave headroom for water, propane, product, and crew.`}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  Set the vehicle's GVWR and curb weight (Vehicles &amp; Workshop) to check
+                  payload. Item weights come from the catalog.
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Gallery */}
         <div className="rounded-xl border border-white/10 bg-ink-soft/60 p-4">

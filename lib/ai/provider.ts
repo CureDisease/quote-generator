@@ -67,6 +67,7 @@ export type ExtractedCatalogItem = Pick<
   | "height_ft"
   | "unit_price"
   | "power_watts"
+  | "weight_lbs"
   | "tags"
   | "notes"
 >;
